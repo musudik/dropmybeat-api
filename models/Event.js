@@ -1,0 +1,287 @@
+const mongoose = require('mongoose');
+
+// Define enums
+const EventType = {
+  WEDDING: 'Wedding',
+  BIRTHDAY: 'Birthday',
+  CORPORATE: 'Corporate',
+  CLUB: 'Club',
+  FESTIVAL: 'Festival',
+  PRIVATE: 'Private',
+  OTHER: 'Other'
+};
+
+const EventStatus = {
+  DRAFT: 'Draft',
+  PUBLISHED: 'Published',
+  ACTIVE: 'Active',
+  PAUSED: 'Paused',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled'
+};
+
+const eventSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: [true, 'Event name is required'],
+    trim: true,
+    maxlength: [100, 'Event name cannot exceed 100 characters']
+  },
+  description: {
+    type: String,
+    trim: true,
+    maxlength: [1000, 'Description cannot exceed 1000 characters']
+  },
+  eventType: {
+    type: String,
+    enum: Object.values(EventType),
+    required: [true, 'Event type is required']
+  },
+  status: {
+    type: String,
+    enum: Object.values(EventStatus),
+    default: EventStatus.DRAFT,
+    required: true
+  },
+  // Event timing
+  startDate: {
+    type: Date,
+    required: [true, 'Start date is required']
+  },
+  endDate: {
+    type: Date,
+    required: [true, 'End date is required']
+  },
+  // Location details
+  venue: {
+    name: {
+      type: String,
+      required: [true, 'Venue name is required'],
+      trim: true,
+      maxlength: [100, 'Venue name cannot exceed 100 characters']
+    },
+    address: {
+      type: String,
+      required: [true, 'Venue address is required'],
+      trim: true,
+      maxlength: [200, 'Address cannot exceed 200 characters']
+    },
+    city: {
+      type: String,
+      required: [true, 'City is required'],
+      trim: true,
+      maxlength: [50, 'City cannot exceed 50 characters']
+    },
+    state: {
+      type: String,
+      trim: true,
+      maxlength: [50, 'State cannot exceed 50 characters']
+    },
+    zipCode: {
+      type: String,
+      trim: true,
+      maxlength: [10, 'Zip code cannot exceed 10 characters']
+    },
+    coordinates: {
+      latitude: Number,
+      longitude: Number
+    }
+  },
+  // Event management
+  manager: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Person',
+    required: [true, 'Event manager is required']
+  },
+  // Event settings
+  maxParticipants: {
+    type: Number,
+    min: [1, 'Maximum participants must be at least 1'],
+    max: [10000, 'Maximum participants cannot exceed 10000']
+  },
+  isPublic: {
+    type: Boolean,
+    default: true
+  },
+  requiresApproval: {
+    type: Boolean,
+    default: false
+  },
+  // Song request settings
+  maxSongsPerUser: {
+    type: Number,
+    default: 5,
+    min: [1, 'Max songs per user must be at least 1'],
+    max: [50, 'Max songs per user cannot exceed 50']
+  },
+  allowDuplicates: {
+    type: Boolean,
+    default: false
+  },
+  // TimeBomb feature settings
+  timeBombEnabled: {
+    type: Boolean,
+    default: false
+  },
+  timeBombDuration: {
+    type: Number, // in minutes
+    default: 30,
+    min: [5, 'TimeBomb duration must be at least 5 minutes'],
+    max: [180, 'TimeBomb duration cannot exceed 180 minutes']
+  },
+  // Media
+  logo: {
+    type: String, // S3 URL
+    default: null
+  },
+  bannerImage: {
+    type: String, // S3 URL
+    default: null
+  },
+  // Access control
+  accessCode: {
+    type: String,
+    trim: true,
+    minlength: [4, 'Access code must be at least 4 characters'],
+    maxlength: [20, 'Access code cannot exceed 20 characters']
+  },
+  // Participants
+  participants: [{
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Person',
+      required: true
+    },
+    joinedAt: {
+      type: Date,
+      default: Date.now
+    },
+    isApproved: {
+      type: Boolean,
+      default: true
+    }
+  }],
+  // Statistics
+  totalSongRequests: {
+    type: Number,
+    default: 0
+  },
+  totalLikes: {
+    type: Number,
+    default: 0
+  },
+  // Audit fields
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Person',
+    required: true
+  },
+  updatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Person'
+  }
+}, {
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
+
+// Virtual for participant count
+eventSchema.virtual('participantCount').get(function() {
+  return this.participants ? this.participants.length : 0;
+});
+
+// Virtual for active status
+eventSchema.virtual('isActive').get(function() {
+  const now = new Date();
+  return this.status === EventStatus.ACTIVE && 
+         this.startDate <= now && 
+         this.endDate >= now;
+});
+
+// Indexes for performance
+eventSchema.index({ manager: 1 });
+eventSchema.index({ status: 1 });
+eventSchema.index({ startDate: 1 });
+eventSchema.index({ endDate: 1 });
+eventSchema.index({ eventType: 1 });
+eventSchema.index({ isPublic: 1 });
+eventSchema.index({ 'participants.user': 1 });
+eventSchema.index({ createdAt: -1 });
+
+// Compound indexes
+eventSchema.index({ status: 1, startDate: 1 });
+eventSchema.index({ manager: 1, status: 1 });
+
+// Pre-save validation
+eventSchema.pre('save', function(next) {
+  // Validate date range
+  if (this.startDate >= this.endDate) {
+    return next(new Error('End date must be after start date'));
+  }
+  
+  // Validate TimeBomb settings
+  if (this.timeBombEnabled && !this.timeBombDuration) {
+    return next(new Error('TimeBomb duration is required when TimeBomb is enabled'));
+  }
+  
+  next();
+});
+
+// Instance methods
+eventSchema.methods.addParticipant = function(userId, isApproved = true) {
+  const existingParticipant = this.participants.find(
+    p => p.user.toString() === userId.toString()
+  );
+  
+  if (existingParticipant) {
+    throw new Error('User is already a participant');
+  }
+  
+  this.participants.push({
+    user: userId,
+    isApproved,
+    joinedAt: new Date()
+  });
+  
+  return this.save();
+};
+
+eventSchema.methods.removeParticipant = function(userId) {
+  this.participants = this.participants.filter(
+    p => p.user.toString() !== userId.toString()
+  );
+  
+  return this.save();
+};
+
+eventSchema.methods.isParticipant = function(userId) {
+  return this.participants.some(
+    p => p.user.toString() === userId.toString() && p.isApproved
+  );
+};
+
+// Static methods
+eventSchema.statics.findActiveEvents = function() {
+  const now = new Date();
+  return this.find({
+    status: EventStatus.ACTIVE,
+    startDate: { $lte: now },
+    endDate: { $gte: now }
+  });
+};
+
+eventSchema.statics.findByManager = function(managerId) {
+  return this.find({ manager: managerId }).sort({ createdAt: -1 });
+};
+
+eventSchema.statics.findPublicEvents = function() {
+  return this.find({ 
+    isPublic: true, 
+    status: { $in: [EventStatus.PUBLISHED, EventStatus.ACTIVE] }
+  }).sort({ startDate: 1 });
+};
+
+module.exports = mongoose.model('Event', eventSchema);
+module.exports.EventType = EventType;
+module.exports.EventStatus = EventStatus;

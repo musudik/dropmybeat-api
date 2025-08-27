@@ -1,0 +1,38 @@
+backend/
+├── server.js                 # Main server entry point
+├── package.json             # Project dependencies
+├── .env                     # Environment variables
+├── .gitignore              # Git ignore file
+├── config/
+│   ├── database.js         # Database connection
+│   ├── jwt.js              # JWT configuration
+│   └── aws.js              # AWS S3 configuration
+├── models/
+│   ├── Person.js           # Person model
+│   ├── Event.js            # Event model
+│   └── SongRequest.js      # Song Request model
+├── routes/
+│   ├── auth.js             # Authentication routes
+│   ├── persons.js          # Person management routes
+│   ├── events.js           # Event management routes
+│   └── songRequests.js     # Song request routes
+├── middleware/
+│   ├── auth.js             # Authentication middleware
+│   ├── validation.js       # Input validation middleware
+│   ├── errorHandler.js     # Error handling middleware
+│   └── upload.js           # File upload middleware
+├── controllers/
+│   ├── authController.js   # Authentication logic
+│   ├── personController.js # Person management logic
+│   ├── eventController.js  # Event management logic
+│   └── songController.js   # Song request logic
+├── utils/
+│   ├── logger.js           # Logging utility
+│   ├── helpers.js          # Helper functions
+│   └── constants.js        # Application constants
+├── sockets/
+│   └── socketHandlers.js   # Socket.io event handlers
+└── tests/
+    ├── auth.test.js        # Authentication tests
+    ├── events.test.js      # Event tests
+    └── songs.test.js       # Song request tests

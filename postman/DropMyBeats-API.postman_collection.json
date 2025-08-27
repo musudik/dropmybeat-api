@@ -1,0 +1,650 @@
+{
+  "info": {
+    "name": "DropMyBeats API",
+    "description": "Complete API collection for DropMyBeats backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "eventId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "songRequestId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"email\": \"test@example.com\",\n  \"password\": \"Test123!\",\n  \"role\": \"Participant\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('authToken', response.token);",
+                  "    pm.collectionVariables.set('userId', response.data._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@dropmybeats.com\",\n  \"password\": \"Admin123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('authToken', response.token);",
+                  "    pm.collectionVariables.set('userId', response.data._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Updated\",\n  \"lastName\": \"Name\",\n  \"phoneNumber\": \"+1987654321\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/updateprofile",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "updateprofile"]
+            }
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"Admin123!\",\n  \"newPassword\": \"NewAdmin123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/changepassword",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "changepassword"]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Person Management",
+      "item": [
+        {
+          "name": "Get All Persons",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/persons?page=1&limit=10&role=Participant",
+              "host": ["{{baseUrl}}"],
+              "path": ["persons"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "role",
+                  "value": "Participant"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Single Person",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/persons/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["persons", "{{userId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Person (Admin Only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"New\",\n  \"lastName\": \"Person\",\n  \"email\": \"newperson@example.com\",\n  \"password\": \"NewPerson123!\",\n  \"role\": \"Participant\",\n  \"phoneNumber\": \"+1555666777\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/persons",
+              "host": ["{{baseUrl}}"],
+              "path": ["persons"]
+            }
+          }
+        },
+        {
+          "name": "Update Person (Admin Only)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Updated\",\n  \"role\": \"Manager\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/persons/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["persons", "{{userId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Person (Admin Only)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/persons/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["persons", "{{userId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Event Management",
+      "item": [
+        {
+          "name": "Get All Events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events?page=1&limit=10&isPublic=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["events"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "isPublic",
+                  "value": "true"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Single Event",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('eventId', response.data._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Event (Manager/Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Event\",\n  \"description\": \"This is a test event created via Postman\",\n  \"startTime\": \"2024-12-31T20:00:00Z\",\n  \"endTime\": \"2024-12-31T23:59:00Z\",\n  \"location\": \"Test Venue\",\n  \"maxParticipants\": 100,\n  \"isPublic\": true,\n  \"allowSongRequests\": true,\n  \"timeBombEnabled\": true,\n  \"timeBombDuration\": 300\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/events",
+              "host": ["{{baseUrl}}"],
+              "path": ["events"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('eventId', response.data._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Event",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Test Event\",\n  \"description\": \"This event has been updated\",\n  \"maxParticipants\": 150\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}"]
+            }
+          }
+        },
+        {
+          "name": "Join Event",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/join",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}", "join"]
+            }
+          }
+        },
+        {
+          "name": "Leave Event",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/leave",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}", "leave"]
+            }
+          }
+        },
+        {
+          "name": "Delete Event",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Song Requests",
+      "item": [
+        {
+          "name": "Get Event Song Requests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/song-requests?status=pending&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}", "song-requests"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Song Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Test Song\",\n  \"artist\": \"Test Artist\",\n  \"album\": \"Test Album\",\n  \"genre\": \"Pop\",\n  \"duration\": 180,\n  \"spotifyId\": \"test123\",\n  \"eventId\": \"{{eventId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/song-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}", "song-requests"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('songRequestId', response.data._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Single Song Request",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/song-requests/{{songRequestId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}", "song-requests", "{{songRequestId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Song Request",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Test Song\",\n  \"priority\": 8\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/song-requests/{{songRequestId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}", "song-requests", "{{songRequestId}}"]
+            }
+          }
+        },
+        {
+          "name": "Like Song Request",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/song-requests/{{songRequestId}}/like",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}", "song-requests", "{{songRequestId}}", "like"]
+            }
+          }
+        },
+        {
+          "name": "Unlike Song Request",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/song-requests/{{songRequestId}}/like",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}", "song-requests", "{{songRequestId}}", "like"]
+            }
+          }
+        },
+        {
+          "name": "Approve Song Request (Manager/Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"priority\": 9\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/song-requests/{{songRequestId}}/approve",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}", "song-requests", "{{songRequestId}}", "approve"]
+            }
+          }
+        },
+        {
+          "name": "Reject Song Request (Manager/Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Not suitable for this event\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/song-requests/{{songRequestId}}/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}", "song-requests", "{{songRequestId}}", "reject"]
+            }
+          }
+        },
+        {
+          "name": "Get Event Queue",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/song-requests/queue",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}", "song-requests", "queue"]
+            }
+          }
+        },
+        {
+          "name": "Get Event Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/song-requests/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}", "song-requests", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Delete Song Request",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/song-requests/{{songRequestId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}", "song-requests", "{{songRequestId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "Server Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5000/health",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "5000",
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
