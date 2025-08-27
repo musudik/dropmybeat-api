@@ -47,7 +47,10 @@ app.use('/api/', limiter);
 
 // CORS
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: [
+    process.env.CLIENT_URL || 'http://localhost:3000',
+    'https://dropmybeat-api.replit.app/'
+  ],
   credentials: true
 }));
 
@@ -69,11 +72,28 @@ app.get('/health', (req, res) => {
     success: true,
     message: 'DropMyBeats API is running',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
+    environment: process.env.NODE_ENV || 'development'
   });
 });
 
-// Mount routers
+// Root endpoint - API information
+app.get('/', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Welcome to DropMyBeats API',
+    version: '1.0.0',
+    documentation: '/api/docs',
+    endpoints: {
+      auth: '/api/auth',
+      persons: '/api/persons',
+      events: '/api/events',
+      songRequests: '/api/events/:eventId/song-requests'
+    },
+    health: '/health'
+  });
+});
+
+// API Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/persons', require('./routes/persons'));
 app.use('/api/events', require('./routes/events'));
