@@ -2,6 +2,7 @@ const Event = require('../models/Event');
 const Person = require('../models/Person');
 const asyncHandler = require('../utils/asyncHandler');
 const ErrorResponse = require('../utils/errorResponse');
+const EventParticipant = require('../models/EventParticipant');
 
 // @desc    Get all events
 // @route   GET /api/events
@@ -60,6 +61,17 @@ exports.getEvents = asyncHandler(async (req, res, next) => {
     .limit(limit)
     .skip(startIndex);
   
+  // Add guest participant counts to each event
+  const eventsWithGuestCounts = await Promise.all(
+    events.map(async (event) => {
+      const guestCount = await EventParticipant.countDocuments({ event: event._id });
+      const eventObj = event.toObject();
+      eventObj.guestParticipantCount = guestCount;
+      eventObj.totalParticipantCount = eventObj.participantCount + guestCount;
+      return eventObj;
+    })
+  );
+  
   // Pagination result
   const pagination = {};
   
@@ -79,10 +91,10 @@ exports.getEvents = asyncHandler(async (req, res, next) => {
   
   res.status(200).json({
     success: true,
-    count: events.length,
+    count: eventsWithGuestCounts.length,
     total,
     pagination,
-    data: events
+    data: eventsWithGuestCounts
   });
 });
 
@@ -92,7 +104,7 @@ exports.getEvents = asyncHandler(async (req, res, next) => {
 exports.getEvent = asyncHandler(async (req, res, next) => {
   const event = await Event.findById(req.params.id)
     .populate('manager', 'firstName lastName email')
-    .populate('participants.person', 'firstName lastName email');
+    .populate('participants.user', 'firstName lastName email');
   
   if (!event) {
     return next(new ErrorResponse('Event not found', 404));
@@ -103,9 +115,15 @@ exports.getEvent = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse('Not authorized to access this event', 403));
   }
   
+  // Add guest participant count
+  const guestCount = await EventParticipant.countDocuments({ event: req.params.id });
+  const eventObj = event.toObject();
+  eventObj.guestParticipantCount = guestCount;
+  eventObj.totalParticipantCount = eventObj.participantCount + guestCount;
+  
   res.status(200).json({
     success: true,
-    data: event
+    data: eventObj
   });
 });
 
@@ -219,7 +237,7 @@ exports.activateEvent = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse('Not authorized to activate this event', 403));
   }
   
-  event.isActive = true;
+  event.status = 'Active';
   await event.save();
   
   res.status(200).json({
@@ -243,7 +261,7 @@ exports.deactivateEvent = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse('Not authorized to deactivate this event', 403));
   }
   
-  event.isActive = false;
+  event.status = 'Draft';
   await event.save();
   
   res.status(200).json({
@@ -252,7 +270,7 @@ exports.deactivateEvent = asyncHandler(async (req, res, next) => {
   });
 });
 
-// @desc    Join event
+// @desc    Join event (authenticated users)
 // @route   POST /api/events/:id/join
 // @access  Private
 exports.joinEvent = asyncHandler(async (req, res, next) => {
@@ -272,7 +290,7 @@ exports.joinEvent = asyncHandler(async (req, res, next) => {
   
   // Check if already joined
   const alreadyJoined = event.participants.some(
-    participant => participant.person.toString() === req.user.id
+    participant => participant.user.toString() === req.user.id
   );
   
   if (alreadyJoined) {
@@ -285,7 +303,7 @@ exports.joinEvent = asyncHandler(async (req, res, next) => {
   }
   
   event.participants.push({
-    person: req.user.id,
+    user: req.user.id,
     joinedAt: new Date()
   });
   
@@ -295,6 +313,96 @@ exports.joinEvent = asyncHandler(async (req, res, next) => {
     success: true,
     message: 'Successfully joined event',
     data: event
+  });
+});
+
+// @desc    Join event with email and name (no auth required)
+// @route   POST /api/events/:id/join-guest
+// @access  Public
+exports.joinEventAsGuest = asyncHandler(async (req, res, next) => {
+  const { email, firstName, lastName } = req.body;
+  
+  // Validate required fields
+  if (!email || !firstName || !lastName) {
+    return next(new ErrorResponse('Email, first name, and last name are required', 400));
+  }
+  
+  const event = await Event.findById(req.params.id);
+  
+  if (!event) {
+    return next(new ErrorResponse('Event not found', 404));
+  }
+  
+  if (!event.isActive) {
+    return next(new ErrorResponse('Cannot join inactive event', 400));
+  }
+  
+  if (!event.isPublic) {
+    return next(new ErrorResponse('Cannot join private event', 403));
+  }
+  
+  // Check if participant already exists (unique email and lastName per event)
+  const existingParticipant = await EventParticipant.participantExists(
+    req.params.id, 
+    email, 
+    lastName
+  );
+  
+  if (existingParticipant) {
+    return next(new ErrorResponse('A participant with this email and last name already exists for this event', 400));
+  }
+  
+  // Check max participants
+  if (event.maxParticipants) {
+    const currentParticipantCount = await EventParticipant.countDocuments({ event: req.params.id });
+    if (currentParticipantCount >= event.maxParticipants) {
+      return next(new ErrorResponse('Event is full', 400));
+    }
+  }
+  
+  // Create new participant
+  const participant = await EventParticipant.create({
+    event: req.params.id,
+    email: email.toLowerCase(),
+    firstName,
+    lastName,
+    isApproved: !event.requiresApproval
+  });
+  
+  await participant.populate('event', 'name startDate endDate venue.name');
+  
+  res.status(201).json({
+    success: true,
+    message: 'Successfully joined event',
+    data: {
+      participant,
+      event: {
+        id: event._id,
+        name: event.name,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        venue: event.venue.name
+      }
+    }
+  });
+});
+
+// @desc    Get event participants (guest participants)
+// @route   GET /api/events/:id/guest-participants
+// @access  Private
+exports.getEventGuestParticipants = asyncHandler(async (req, res, next) => {
+  const event = await Event.findById(req.params.id);
+  
+  if (!event) {
+    return next(new ErrorResponse('Event not found', 404));
+  }
+  
+  const participants = await EventParticipant.findByEvent(req.params.id);
+  
+  res.status(200).json({
+    success: true,
+    count: participants.length,
+    data: participants
   });
 });
 
@@ -332,7 +440,7 @@ exports.leaveEvent = asyncHandler(async (req, res, next) => {
 // @access  Private/Manager of event or Admin or Participant of event
 exports.getEventParticipants = asyncHandler(async (req, res, next) => {
   const event = await Event.findById(req.params.id)
-    .populate('participants.person', 'firstName lastName email role');
+    .populate('participants.user', 'firstName lastName email role');
   
   if (!event) {
     return next(new ErrorResponse('Event not found', 404));
@@ -340,7 +448,7 @@ exports.getEventParticipants = asyncHandler(async (req, res, next) => {
   
   // Check if user can view participants
   const isParticipant = event.participants.some(
-    participant => participant.person._id.toString() === req.user.id
+    participant => participant.user._id.toString() === req.user.id
   );
   
   if (req.user.role !== 'Admin' && 

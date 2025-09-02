@@ -9,7 +9,9 @@ const {
   deactivateEvent,
   joinEvent,
   leaveEvent,
-  getEventParticipants
+  getEventParticipants,
+  joinEventAsGuest,
+  getEventGuestParticipants
 } = require('../controllers/eventController');
 const { protect, authorize, optionalAuth } = require('../middleware/auth');
 const {
@@ -48,6 +50,11 @@ router
   .route('/:id/join')
   .post(protect, validateObjectId('id'), handleValidationErrors, joinEvent);
 
+// New guest join route (no authentication required)
+router
+  .route('/:id/join-guest')
+  .post(validateObjectId('id'), handleValidationErrors, joinEventAsGuest);
+
 router
   .route('/:id/leave')
   .post(protect, validateObjectId('id'), handleValidationErrors, leaveEvent);
@@ -56,4 +63,8 @@ router
   .route('/:id/participants')
   .get(protect, validateObjectId('id'), handleValidationErrors, getEventParticipants);
 
+// New guest participants route
+router
+  .route('/:id/guest-participants')
+  .get(protect, validateObjectId('id'), handleValidationErrors, getEventGuestParticipants);
 module.exports = router;
