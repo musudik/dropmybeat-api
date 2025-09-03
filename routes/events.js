@@ -11,20 +11,29 @@ const {
   leaveEvent,
   getEventParticipants,
   joinEventAsGuest,
-  getEventGuestParticipants
+  getEventGuestMembers
 } = require('../controllers/eventController');
-const { protect, authorize, optionalAuth } = require('../middleware/auth');
+const { createSongRequest } = require('../controllers/songRequestController');
+const { 
+  protect, 
+  authorize, 
+  optionalAuth, 
+  adminOnly,
+  managerEventAccess,
+  eventParticipantAccess
+} = require('../middleware/auth');
 const {
   validateEventCreation,
   validateEventUpdate,
   validateObjectId,
   validatePagination,
+  validateSongRequest,
   handleValidationErrors
 } = require('../middleware/validation');
 
 const router = express.Router();
 
-// Public routes (with optional authentication)
+// Public routes (with optional authentication for role-based filtering)
 router
   .route('/')
   .get(optionalAuth, validatePagination, handleValidationErrors, getEvents)
@@ -33,38 +42,48 @@ router
 router
   .route('/:id')
   .get(optionalAuth, validateObjectId('id'), handleValidationErrors, getEvent)
-  .put(protect, validateObjectId('id'), validateEventUpdate, handleValidationErrors, updateEvent)
-  .delete(protect, validateObjectId('id'), handleValidationErrors, deleteEvent);
+  .put(protect, managerEventAccess, validateObjectId('id'), validateEventUpdate, handleValidationErrors, updateEvent)
+  .delete(protect, managerEventAccess, validateObjectId('id'), handleValidationErrors, deleteEvent);
 
-// Event management routes
+// Event management routes (Manager/Admin only)
 router
   .route('/:id/activate')
-  .put(protect, validateObjectId('id'), handleValidationErrors, activateEvent);
+  .put(protect, managerEventAccess, validateObjectId('id'), handleValidationErrors, activateEvent);
 
 router
   .route('/:id/deactivate')
-  .put(protect, validateObjectId('id'), handleValidationErrors, deactivateEvent);
+  .put(protect, managerEventAccess, validateObjectId('id'), handleValidationErrors, deactivateEvent);
 
-// Participant management routes
+// Member management routes
 router
   .route('/:id/join')
-  .post(protect, validateObjectId('id'), handleValidationErrors, joinEvent);
+  .post(protect, authorize('Member'), validateObjectId('id'), handleValidationErrors, joinEvent);
 
-// New guest join route (no authentication required)
+// Guest join route (no authentication required)
 router
   .route('/:id/join-guest')
   .post(validateObjectId('id'), handleValidationErrors, joinEventAsGuest);
 
 router
   .route('/:id/leave')
-  .post(protect, validateObjectId('id'), handleValidationErrors, leaveEvent);
+  .post(protect, authorize('Member', 'Guest'), validateObjectId('id'), handleValidationErrors, leaveEvent);
+
+// Participant viewing routes (Manager/Admin only)
+router
+  .route('/:id/Members')
+  .get(protect, managerEventAccess, validateObjectId('id'), handleValidationErrors, getEventParticipants);
 
 router
-  .route('/:id/participants')
-  .get(protect, validateObjectId('id'), handleValidationErrors, getEventParticipants);
+  .route('/:id/guest-Members')
+  .get(protect, managerEventAccess, validateObjectId('id'), handleValidationErrors, getEventGuestMembers);
 
-// New guest participants route
-router
-  .route('/:id/guest-participants')
-  .get(protect, validateObjectId('id'), handleValidationErrors, getEventGuestParticipants);
+// Song request routes (Members and Guests who joined events)
+router.post('/:eventId/song-requests', 
+  protect, 
+  eventParticipantAccess, 
+  validateSongRequest, 
+  handleValidationErrors, 
+  createSongRequest
+);
+
 module.exports = router;

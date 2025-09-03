@@ -6,7 +6,7 @@ const EventParticipant = require('../models/EventParticipant');
 
 // @desc    Get all events
 // @route   GET /api/events
-// @access  Public (filtered by isPublic) / Private (all events for authenticated users)
+// @access  Public (filtered by role)
 exports.getEvents = asyncHandler(async (req, res, next) => {
   const page = parseInt(req.query.page, 10) || 1;
   const limit = parseInt(req.query.limit, 10) || 25;
@@ -14,19 +14,41 @@ exports.getEvents = asyncHandler(async (req, res, next) => {
   
   let query = {};
   
-  // If user is not authenticated, only show public events
+  // Role-based filtering
   if (!req.user) {
+    // Unauthenticated users - only public events
     query.isPublic = true;
-    query.isActive = true;
+    query.status = 'Active';
   } else {
-    // Filter by active status if specified
-    if (req.query.active !== undefined) {
-      query.isActive = req.query.active === 'true';
-    }
-    
-    // Filter by public status if specified
-    if (req.query.public !== undefined) {
-      query.isPublic = req.query.public === 'true';
+    switch (req.user.role) {
+      case 'Admin':
+        // Admin can see all events
+        break;
+      case 'Manager':
+        // Manager can see all public events + their own events
+        if (req.query.myEvents === 'true') {
+          query.manager = req.user.id;
+        } else {
+          query.$or = [
+            { isPublic: true },
+            { manager: req.user.id }
+          ];
+        }
+        break;
+      case 'Member':
+        // Member can see all public events
+        query.isPublic = true;
+        break;
+      case 'Guest':
+        // Guest can only see events they've joined
+        const joinedEvents = await Event.find({
+          'Members.user': req.user.id,
+          'Members.isApproved': true
+        }).select('_id');
+        query._id = { $in: joinedEvents.map(e => e._id) };
+        break;
+      default:
+        query.isPublic = true;
     }
   }
   
@@ -45,29 +67,31 @@ exports.getEvents = asyncHandler(async (req, res, next) => {
   
   // Filter by date range
   if (req.query.startDate || req.query.endDate) {
-    query.startTime = {};
+    query.startDate = {};
     if (req.query.startDate) {
-      query.startTime.$gte = new Date(req.query.startDate);
+      query.startDate.$gte = new Date(req.query.startDate);
     }
     if (req.query.endDate) {
-      query.startTime.$lte = new Date(req.query.endDate);
+      query.startDate.$lte = new Date(req.query.endDate);
     }
   }
   
   const total = await Event.countDocuments(query);
   const events = await Event.find(query)
     .populate('manager', 'firstName lastName email')
-    .sort({ startTime: 1 })
+    .sort({ startDate: 1 })
     .limit(limit)
     .skip(startIndex);
   
-  // Add guest participant counts to each event
-  const eventsWithGuestCounts = await Promise.all(
+  // Add guest Member counts and details to each event
+  const eventsWithGuestDetails = await Promise.all(
     events.map(async (event) => {
-      const guestCount = await EventParticipant.countDocuments({ event: event._id });
+      const guestMembers = await EventParticipant.find({ event: event._id })
+        .select('email firstName lastName isApproved joinedAt');
       const eventObj = event.toObject();
-      eventObj.guestParticipantCount = guestCount;
-      eventObj.totalParticipantCount = eventObj.participantCount + guestCount;
+      eventObj.guestMembers = guestMembers;
+      eventObj.guestMemberCount = guestMembers.length;
+      eventObj.totalMemberCount = eventObj.MemberCount + guestMembers.length;
       return eventObj;
     })
   );
@@ -91,35 +115,69 @@ exports.getEvents = asyncHandler(async (req, res, next) => {
   
   res.status(200).json({
     success: true,
-    count: eventsWithGuestCounts.length,
+    count: eventsWithGuestDetails.length,
     total,
     pagination,
-    data: eventsWithGuestCounts
+    data: eventsWithGuestDetails
   });
 });
 
 // @desc    Get single event
 // @route   GET /api/events/:id
-// @access  Public (if public event) / Private
+// @access  Role-based access
 exports.getEvent = asyncHandler(async (req, res, next) => {
   const event = await Event.findById(req.params.id)
     .populate('manager', 'firstName lastName email')
-    .populate('participants.user', 'firstName lastName email');
+    .populate('Members.user', 'firstName lastName email');
   
   if (!event) {
     return next(new ErrorResponse('Event not found', 404));
   }
   
-  // Check if user can access this event
-  if (!event.isPublic && (!req.user || (req.user.role !== 'Admin' && req.user.id !== event.manager.toString()))) {
-    return next(new ErrorResponse('Not authorized to access this event', 403));
+  // Role-based access control
+  if (!req.user) {
+    // Unauthenticated users - only public events
+    if (!event.isPublic) {
+      return next(new ErrorResponse('Not authorized to access this event', 403));
+    }
+  } else {
+    switch (req.user.role) {
+      case 'Admin':
+        // Admin can access all events
+        break;
+      case 'Manager':
+        // Manager can access public events + their own events
+        if (!event.isPublic && event.manager.toString() !== req.user.id) {
+          return next(new ErrorResponse('Not authorized to access this event', 403));
+        }
+        break;
+      case 'Member':
+        // Member can access all public events
+        if (!event.isPublic) {
+          return next(new ErrorResponse('Not authorized to access this event', 403));
+        }
+        break;
+      case 'Guest':
+        // Guest can only access events they've joined
+        const isMember = event.Members.some(
+          p => p.user.toString() === req.user.id && p.isApproved
+        );
+        if (!isMember) {
+          return next(new ErrorResponse('Not authorized to access this event', 403));
+        }
+        break;
+      default:
+        if (!event.isPublic) {
+          return next(new ErrorResponse('Not authorized to access this event', 403));
+        }
+    }
   }
   
-  // Add guest participant count
+  // Add guest Member count
   const guestCount = await EventParticipant.countDocuments({ event: req.params.id });
   const eventObj = event.toObject();
-  eventObj.guestParticipantCount = guestCount;
-  eventObj.totalParticipantCount = eventObj.participantCount + guestCount;
+  eventObj.guestMemberCount = guestCount;
+  eventObj.totalMemberCount = eventObj.MemberCount + guestCount;
   
   res.status(200).json({
     success: true,
@@ -284,25 +342,25 @@ exports.joinEvent = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse('Cannot join inactive event', 400));
   }
   
-  if (!event.isPublic && req.user.role === 'Participant') {
+  if (!event.isPublic && req.user.role === 'Member') {
     return next(new ErrorResponse('Cannot join private event', 403));
   }
   
   // Check if already joined
-  const alreadyJoined = event.participants.some(
-    participant => participant.user.toString() === req.user.id
+  const alreadyJoined = event.Members.some(
+    Member => Member.user.toString() === req.user.id
   );
   
   if (alreadyJoined) {
     return next(new ErrorResponse('Already joined this event', 400));
   }
   
-  // Check max participants
-  if (event.maxParticipants && event.participants.length >= event.maxParticipants) {
+  // Check max Members
+  if (event.maxMembers && event.Members.length >= event.maxMembers) {
     return next(new ErrorResponse('Event is full', 400));
   }
   
-  event.participants.push({
+  event.Members.push({
     user: req.user.id,
     joinedAt: new Date()
   });
@@ -341,27 +399,27 @@ exports.joinEventAsGuest = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse('Cannot join private event', 403));
   }
   
-  // Check if participant already exists (unique email and lastName per event)
-  const existingParticipant = await EventParticipant.participantExists(
+  // Check if Member already exists (unique email and lastName per event)
+  const existingMember = await EventParticipant.MemberExists(
     req.params.id, 
     email, 
     lastName
   );
   
-  if (existingParticipant) {
-    return next(new ErrorResponse('A participant with this email and last name already exists for this event', 400));
+  if (existingMember) {
+    return next(new ErrorResponse('A Member with this email and last name already exists for this event', 400));
   }
   
-  // Check max participants
-  if (event.maxParticipants) {
-    const currentParticipantCount = await EventParticipant.countDocuments({ event: req.params.id });
-    if (currentParticipantCount >= event.maxParticipants) {
+  // Check max Members
+  if (event.maxMembers) {
+    const currentMemberCount = await EventParticipant.countDocuments({ event: req.params.id });
+    if (currentMemberCount >= event.maxMembers) {
       return next(new ErrorResponse('Event is full', 400));
     }
   }
   
-  // Create new participant
-  const participant = await EventParticipant.create({
+  // Create new Member
+  const Member = await EventParticipant.create({
     event: req.params.id,
     email: email.toLowerCase(),
     firstName,
@@ -369,13 +427,13 @@ exports.joinEventAsGuest = asyncHandler(async (req, res, next) => {
     isApproved: !event.requiresApproval
   });
   
-  await participant.populate('event', 'name startDate endDate venue.name');
+  await Member.populate('event', 'name startDate endDate venue.name');
   
   res.status(201).json({
     success: true,
     message: 'Successfully joined event',
     data: {
-      participant,
+      Member,
       event: {
         id: event._id,
         name: event.name,
@@ -387,22 +445,22 @@ exports.joinEventAsGuest = asyncHandler(async (req, res, next) => {
   });
 });
 
-// @desc    Get event participants (guest participants)
-// @route   GET /api/events/:id/guest-participants
+// @desc    Get event Members (guest Members)
+// @route   GET /api/events/:id/guest-Members
 // @access  Private
-exports.getEventGuestParticipants = asyncHandler(async (req, res, next) => {
+exports.getEventGuestMembers = asyncHandler(async (req, res, next) => {
   const event = await Event.findById(req.params.id);
   
   if (!event) {
     return next(new ErrorResponse('Event not found', 404));
   }
   
-  const participants = await EventParticipant.findByEvent(req.params.id);
+  const Members = await EventParticipant.findByEvent(req.params.id);
   
   res.status(200).json({
     success: true,
-    count: participants.length,
-    data: participants
+    count: Members.length,
+    data: Members
   });
 });
 
@@ -416,16 +474,16 @@ exports.leaveEvent = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse('Event not found', 404));
   }
   
-  // Check if user is a participant
-  const participantIndex = event.participants.findIndex(
-    participant => participant.person.toString() === req.user.id
+  // Check if user is a Member
+  const MemberIndex = event.Members.findIndex(
+    Member => Member.person.toString() === req.user.id
   );
   
-  if (participantIndex === -1) {
-    return next(new ErrorResponse('Not a participant of this event', 400));
+  if (MemberIndex === -1) {
+    return next(new ErrorResponse('Not a Member of this event', 400));
   }
   
-  event.participants.splice(participantIndex, 1);
+  event.Members.splice(MemberIndex, 1);
   await event.save();
   
   res.status(200).json({
@@ -435,31 +493,31 @@ exports.leaveEvent = asyncHandler(async (req, res, next) => {
   });
 });
 
-// @desc    Get event participants
-// @route   GET /api/events/:id/participants
-// @access  Private/Manager of event or Admin or Participant of event
+// @desc    Get event Members
+// @route   GET /api/events/:id/Members
+// @access  Private/Manager of event or Admin or Member of event
 exports.getEventParticipants = asyncHandler(async (req, res, next) => {
   const event = await Event.findById(req.params.id)
-    .populate('participants.user', 'firstName lastName email role');
+    .populate('Members.user', 'firstName lastName email role');
   
   if (!event) {
     return next(new ErrorResponse('Event not found', 404));
   }
   
-  // Check if user can view participants
-  const isParticipant = event.participants.some(
-    participant => participant.user._id.toString() === req.user.id
+  // Check if user can view Members
+  const isMember = event.Members.some(
+    Member => Member.user._id.toString() === req.user.id
   );
   
   if (req.user.role !== 'Admin' && 
       req.user.id !== event.manager.toString() && 
-      !isParticipant) {
-    return next(new ErrorResponse('Not authorized to view participants', 403));
+      !isMember) {
+    return next(new ErrorResponse('Not authorized to view Members', 403));
   }
   
   res.status(200).json({
     success: true,
-    count: event.participants.length,
-    data: event.participants
+    count: event.Members.length,
+    data: event.Members
   });
 });

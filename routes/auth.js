@@ -3,6 +3,7 @@ const {
   register,
   login,
   getMe,
+  guestLogin,
   updateProfile,
   changePassword,
   logout
@@ -21,6 +22,7 @@ const router = express.Router();
 // Public routes
 router.post('/register', validateRegistration, handleValidationErrors, register);
 router.post('/login', validateLogin, handleValidationErrors, login);
+router.post('/guest-login', guestLogin);
 
 // Protected routes
 router.get('/me', protect, getMe);

@@ -59,7 +59,7 @@ const seedData = async () => {
         lastName: 'Johnson',
         email: 'alice@example.com',
         password: await bcrypt.hash('User123!', 12),
-        role: 'Participant',
+        role: 'Member',
         phoneNumber: '+1234567893',
         favoriteGenres: ['Pop', 'Rock']
       },
@@ -68,7 +68,7 @@ const seedData = async () => {
         lastName: 'Smith',
         email: 'bob@example.com',
         password: await bcrypt.hash('User123!', 12),
-        role: 'Participant',
+        role: 'Member',
         phoneNumber: '+1234567894',
         favoriteGenres: ['Hip Hop', 'Rap']
       },
@@ -77,7 +77,7 @@ const seedData = async () => {
         lastName: 'Wilson',
         email: 'emma@example.com',
         password: await bcrypt.hash('User123!', 12),
-        role: 'Participant',
+        role: 'Member',
         phoneNumber: '+1234567895',
         favoriteGenres: ['Electronic', 'Pop']
       }
@@ -88,7 +88,7 @@ const seedData = async () => {
 
     // Get managers for events
     const managers = createdPersons.filter(p => p.role === 'Manager');
-    const participants = createdPersons.filter(p => p.role === 'Participant');
+    const Members = createdPersons.filter(p => p.role === 'Member');
 
     // Create sample events
     console.log('🎉 Creating sample events...');
@@ -108,14 +108,14 @@ const seedData = async () => {
         },
         manager: managers[0]._id,
         createdBy: managers[0]._id,
-        maxParticipants: 500,
+        maxMembers: 500,
         isPublic: true,
         allowSongRequests: true,
         timeBombEnabled: true,
         timeBombDuration: 120, // Fixed: was 300, max is 180
-        participants: [
-          { user: participants[0]._id },
-          { user: participants[1]._id }
+        Members: [
+          { user: Members[0]._id },
+          { user: Members[1]._id }
         ]
       },
       {
@@ -133,12 +133,12 @@ const seedData = async () => {
         },
         manager: managers[1]._id,
         createdBy: managers[1]._id,
-        maxParticipants: 100,
+        maxMembers: 100,
         isPublic: false,
         allowSongRequests: true,
         timeBombEnabled: false,
-        participants: [
-          { user: participants[2]._id }
+        Members: [
+          { user: Members[2]._id }
         ]
       },
       {
@@ -156,12 +156,12 @@ const seedData = async () => {
         },
         manager: managers[0]._id,
         createdBy: managers[0]._id,
-        maxParticipants: 50,
+        maxMembers: 50,
         isPublic: true,
         allowSongRequests: true,
         timeBombEnabled: true,
         timeBombDuration: 180, // Fixed: was 600, max is 180
-        participants: participants.map(p => ({ user: p._id }))
+        Members: Members.map(p => ({ user: p._id }))
       },
       {
         name: 'Wedding Reception - Smith & Johnson',
@@ -178,11 +178,11 @@ const seedData = async () => {
         },
         manager: managers[1]._id,
         createdBy: managers[1]._id,
-        maxParticipants: 200,
+        maxMembers: 200,
         isPublic: false,
         allowSongRequests: true,
         timeBombEnabled: false,
-        participants: []
+        Members: []
       }
     ];
 
@@ -199,13 +199,13 @@ const seedData = async () => {
         genre: 'Pop',
         duration: 200,
         spotifyId: '0VjIjW4GlULA4LGoDOLVKN',
-        requestedBy: participants[0]._id,
+        requestedBy: Members[0]._id,
         event: createdEvents[0]._id,
         status: 'Approved', // Fixed: was 'approved'
         priority: 8,
         likes: [
-          { user: participants[1]._id },
-          { user: participants[2]._id }
+          { user: Members[1]._id },
+          { user: Members[2]._id }
         ] // Fixed: was array of IDs
       },
       {
@@ -215,12 +215,12 @@ const seedData = async () => {
         genre: 'Pop',
         duration: 203,
         spotifyId: '463CkQjx2Zk1yXoBuierM9',
-        requestedBy: participants[1]._id,
+        requestedBy: Members[1]._id,
         event: createdEvents[0]._id,
         status: 'Pending', // Fixed: was 'pending'
         priority: 7,
         likes: [
-          { user: participants[0]._id }
+          { user: Members[0]._id }
         ] // Fixed: was array of IDs
       },
       {
@@ -229,11 +229,11 @@ const seedData = async () => {
         album: 'Discovery',
         genre: 'Electronic',
         duration: 320,
-        requestedBy: participants[2]._id,
+        requestedBy: Members[2]._id,
         event: createdEvents[2]._id,
         status: 'Approved', // Fixed: was 'approved'
         priority: 9,
-        likes: participants.map(p => ({ user: p._id })) // Fixed: was array of IDs
+        likes: Members.map(p => ({ user: p._id })) // Fixed: was array of IDs
       },
       {
         title: 'Good 4 U',
@@ -241,7 +241,7 @@ const seedData = async () => {
         album: 'SOUR',
         genre: 'Pop Rock',
         duration: 178,
-        requestedBy: participants[0]._id,
+        requestedBy: Members[0]._id,
         event: createdEvents[1]._id,
         status: 'Played', // Fixed: was 'played'
         priority: 6,
@@ -254,7 +254,7 @@ const seedData = async () => {
         genre: 'Hip Hop',
         duration: 212,
         youtubeId: 'UTHLKHL_whs',
-        requestedBy: participants[1]._id,
+        requestedBy: Members[1]._id,
         event: createdEvents[0]._id,
         status: 'Rejected', // Fixed: was 'rejected'
         rejectionReason: 'Explicit content not suitable for this event'
@@ -264,7 +264,7 @@ const seedData = async () => {
         artist: 'The Kid LAROI & Justin Bieber',
         genre: 'Pop',
         duration: 141,
-        requestedBy: participants[2]._id,
+        requestedBy: Members[2]._id,
         event: createdEvents[2]._id,
         status: 'Pending', // Fixed: was 'pending'
         priority: 5,

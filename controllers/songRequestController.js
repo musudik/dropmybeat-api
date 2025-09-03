@@ -1,6 +1,7 @@
 const SongRequest = require('../models/SongRequest');
 const Event = require('../models/Event');
 const Person = require('../models/Person');
+const EventParticipant = require('../models/EventParticipant');
 const ErrorResponse = require('../utils/errorResponse');
 const asyncHandler = require('../utils/asyncHandler');
 
@@ -18,7 +19,7 @@ exports.getSongRequests = asyncHandler(async (req, res, next) => {
   }
 
   // Check access permissions
-  if (!event.isPublic && (!req.user || !event.participants.includes(req.user.id))) {
+  if (!event.isPublic && (!req.user || !event.Members.includes(req.user.id))) {
     return next(new ErrorResponse('Access denied to this event', 403));
   }
 
@@ -49,11 +50,11 @@ exports.getSongRequests = asyncHandler(async (req, res, next) => {
   const total = await SongRequest.countDocuments(query);
   
   const songRequests = await SongRequest.find(query)
-    .populate('requestedBy', 'firstName lastName profilePicture')
-    .populate('approvedBy', 'firstName lastName')
-    .sort(sort)
-    .skip(startIndex)
-    .limit(parseInt(limit));
+    .populate('requestedBy', 'firstName lastName email')
+    .populate('event', 'name startDate endDate')
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .skip(startIndex);
 
   // Pagination result
   const pagination = {};
@@ -85,7 +86,7 @@ exports.getSongRequest = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse('Event not found', 404));
   }
 
-  if (!event.isPublic && (!req.user || !event.participants.includes(req.user.id))) {
+  if (!event.isPublic && (!req.user || !event.Members.includes(req.user.id))) {
     return next(new ErrorResponse('Access denied to this event', 403));
   }
 
@@ -105,7 +106,7 @@ exports.getSongRequest = asyncHandler(async (req, res, next) => {
 
 // @desc    Create song request
 // @route   POST /api/events/:eventId/song-requests
-// @access  Private (must be event participant)
+// @access  Private (must be event Member)
 exports.createSongRequest = asyncHandler(async (req, res, next) => {
   const { eventId } = req.params;
   const { title, artist, album, duration, spotifyId, youtubeId, message } = req.body;
@@ -120,9 +121,21 @@ exports.createSongRequest = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse('Event is not active', 400));
   }
 
-  // Check if user is participant
-  if (!event.participants.includes(req.user.id)) {
-    return next(new ErrorResponse('You must be a participant to request songs', 403));
+  // Check if user can request songs (admin, manager, event manager, regular Member, or guest Member)
+  const user = await Person.findById(req.user.id);
+  const isAdmin = user.role === 'Admin';
+  const isManager = user.role === 'Manager';
+  const isGuest = user.role === 'Guest';
+  const isEventManager = event.manager.toString() === req.user.id;
+  const isRegularMember = event.Members.includes(req.user.id);
+  const isGuestMember = await EventParticipant.findOne({
+    event: eventId,
+    email: req.user.email,
+    isApproved: true
+  });
+
+  if (!isAdmin && !isManager && !isEventManager && !isRegularMember && !isGuestMember && !isGuest) {
+    return next(new ErrorResponse('You must be a Member to request songs', 403));
   }
 
   // Check for duplicate requests
@@ -147,8 +160,8 @@ exports.createSongRequest = asyncHandler(async (req, res, next) => {
     status: { $in: ['pending', 'approved'] }
   });
 
-  if (userRequestCount >= event.settings.maxSongRequestsPerUser) {
-    return next(new ErrorResponse(`Maximum ${event.settings.maxSongRequestsPerUser} song requests allowed per user`, 400));
+  if (userRequestCount >= event.maxSongsPerUser) {
+    return next(new ErrorResponse(`Maximum ${event.maxSongsPerUser} song requests allowed per user`, 400));
   }
 
   // Create song request
@@ -275,18 +288,18 @@ exports.deleteSongRequest = asyncHandler(async (req, res, next) => {
 
 // @desc    Like/Unlike song request
 // @route   POST /api/events/:eventId/song-requests/:id/like
-// @access  Private (event participants)
+// @access  Private (event Members)
 exports.toggleLike = asyncHandler(async (req, res, next) => {
   const { eventId, id } = req.params;
 
-  // Check if event exists and user is participant
+  // Check if event exists and user is Member
   const event = await Event.findById(eventId);
   if (!event) {
     return next(new ErrorResponse('Event not found', 404));
   }
 
-  if (!event.participants.includes(req.user.id)) {
-    return next(new ErrorResponse('You must be a participant to like songs', 403));
+  if (!event.Members.includes(req.user.id)) {
+    return next(new ErrorResponse('You must be a Member to like songs', 403));
   }
 
   const songRequest = await SongRequest.findOne({ _id: id, event: eventId });
@@ -326,7 +339,13 @@ exports.approveSongRequest = asyncHandler(async (req, res, next) => {
   const { eventId, id } = req.params;
   const { queuePosition } = req.body;
 
-  const songRequest = await SongRequest.findOne({ _id: id, event: eventId });
+  const songRequest = await SongRequest.findByIdAndUpdate(
+    req.params.id,
+    { status: 'approved' },
+    { new: true }
+  )
+  .populate('requestedBy', 'firstName lastName email')
+  .populate('event', 'name startDate endDate');
   if (!songRequest) {
     return next(new ErrorResponse('Song request not found', 404));
   }
@@ -357,7 +376,13 @@ exports.rejectSongRequest = asyncHandler(async (req, res, next) => {
   const { eventId, id } = req.params;
   const { reason } = req.body;
 
-  const songRequest = await SongRequest.findOne({ _id: id, event: eventId });
+  const songRequest = await SongRequest.findByIdAndUpdate(
+    req.params.id,
+    { status: 'rejected' },
+    { new: true }
+  )
+  .populate('requestedBy', 'firstName lastName email')
+  .populate('event', 'name startDate endDate');
   if (!songRequest) {
     return next(new ErrorResponse('Song request not found', 404));
   }
@@ -393,7 +418,7 @@ exports.getEventQueue = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse('Event not found', 404));
   }
 
-  if (!event.isPublic && (!req.user || !event.participants.includes(req.user.id))) {
+  if (!event.isPublic && (!req.user || !event.Members.includes(req.user.id))) {
     return next(new ErrorResponse('Access denied to this event', 403));
   }
 

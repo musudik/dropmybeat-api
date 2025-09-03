@@ -2,17 +2,17 @@
 
 ## Overview
 
-DropMyBeats is an interactive mobile application backend that facilitates real-time song requests and interactions between DJs and participants at events. The backend supports role-based access control, real-time updates, file management, and scalable event management.
+DropMyBeats is an interactive mobile application backend that facilitates real-time song requests and interactions between DJs and Members at events. The backend supports role-based access control, real-time updates, file management, and scalable event management.
 
 ## Features
 
-- **Role-Based Access Control**: Admin, Manager, and Participant roles with specific permissions
+- **Role-Based Access Control**: Admin, Manager, and Member roles with specific permissions
 - **Real-Time Communication**: Socket.io for live song requests and updates
 - **Event Management**: Create, manage, and join events with unique links/QR codes
 - **Song Request System**: Request, like, and manage songs with TimeBomb feature
 - **File Upload**: AWS S3 integration for event logos
 - **Authentication**: JWT-based secure authentication
-- **Scalable Architecture**: Built for 500+ participants per event
+- **Scalable Architecture**: Built for 500+ Members per event
 
 ## Technology Stack
 
@@ -170,11 +170,11 @@ The API follows RESTful conventions and includes the following main endpoints:
 - `POST /api/events/:id/join` - Join event
 - `POST /api/events/:id/leave` - Leave event
 
-### Participant Management
-- `GET /api/events/:eventId/participants` - Get event participants
-- `POST /api/events/:eventId/participants` - Add participant
-- `PUT /api/events/:eventId/participants/:personId` - Update participant
-- `DELETE /api/events/:eventId/participants/:personId` - Remove participant
+### Member Management
+- `GET /api/events/:eventId/Members` - Get event Members
+- `POST /api/events/:eventId/Members` - Add Member
+- `PUT /api/events/:eventId/Members/:personId` - Update Member
+- `DELETE /api/events/:eventId/Members/:personId` - Remove Member
 
 ### Song Requests
 - `GET /api/events/:eventId/song-requests` - Get song requests
@@ -209,11 +209,11 @@ The application uses Socket.io for real-time communication:
 
 ### Manager
 - Manage Events (create, update, delete, activate/deactivate)
-- Manage Participants within their events
+- Manage Members within their events
 - Manage Song Requests within their events
 - Upload event logos
 
-### Participant
+### Member
 - Join events via link/QR code
 - Request songs
 - Like song requests

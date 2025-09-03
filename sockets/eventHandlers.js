@@ -45,7 +45,7 @@ const handleConnection = (io) => {
         }
 
         // Check access permissions
-        if (!event.isPublic && (!socket.user || !event.participants.includes(socket.user._id))) {
+        if (!event.isPublic && (!socket.user || !event.Members.includes(socket.user._id))) {
           socket.emit('error', { message: 'Access denied to this event' });
           return;
         }
@@ -131,7 +131,7 @@ const handleConnection = (io) => {
 
         // Validate event access
         const event = await Event.findById(eventId);
-        if (!event || (!event.isPublic && !event.participants.includes(socket.user._id))) {
+        if (!event || (!event.isPublic && !event.Members.includes(socket.user._id))) {
           socket.emit('error', { message: 'Access denied' });
           return;
         }

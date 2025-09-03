@@ -34,8 +34,8 @@ exports.validateRegistration = [
     .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
   body('role')
     .optional()
-    .isIn(['Admin', 'Manager', 'Participant'])
-    .withMessage('Role must be Admin, Manager, or Participant')
+    .isIn(['Admin', 'Manager', 'Member'])
+    .withMessage('Role must be Admin, Manager, or Member')
 ];
 
 exports.validateLogin = [
@@ -105,8 +105,8 @@ exports.validatePersonCreation = [
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
   body('role')
-    .isIn(['Admin', 'Manager', 'Participant'])
-    .withMessage('Role must be Admin, Manager, or Participant'),
+    .isIn(['Admin', 'Manager', 'Member'])
+    .withMessage('Role must be Admin, Manager, or Member'),
   body('phoneNumber')
     .optional()
     .isMobilePhone()
@@ -135,8 +135,8 @@ exports.validatePersonUpdate = [
     .withMessage('Please provide a valid email'),
   body('role')
     .optional()
-    .isIn(['Admin', 'Manager', 'Participant'])
-    .withMessage('Role must be Admin, Manager, or Participant'),
+    .isIn(['Admin', 'Manager', 'Member'])
+    .withMessage('Role must be Admin, Manager, or Member'),
   body('phoneNumber')
     .optional()
     .isMobilePhone()
@@ -179,10 +179,10 @@ exports.validateEventCreation = [
     .trim()
     .isLength({ max: 200 })
     .withMessage('Location cannot exceed 200 characters'),
-  body('maxParticipants')
+  body('maxMembers')
     .optional()
     .isInt({ min: 1, max: 10000 })
-    .withMessage('Max participants must be between 1 and 10000'),
+    .withMessage('Max Members must be between 1 and 10000'),
   body('isPublic')
     .optional()
     .isBoolean()
@@ -225,10 +225,10 @@ exports.validateEventUpdate = [
     .trim()
     .isLength({ max: 200 })
     .withMessage('Location cannot exceed 200 characters'),
-  body('maxParticipants')
+  body('maxMembers')
     .optional()
     .isInt({ min: 1, max: 10000 })
-    .withMessage('Max participants must be between 1 and 10000'),
+    .withMessage('Max Members must be between 1 and 10000'),
   body('isPublic')
     .optional()
     .isBoolean()

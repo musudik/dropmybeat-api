@@ -8,7 +8,7 @@ const {
   activatePerson,
   deactivatePerson
 } = require('../controllers/personController');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, adminOnly } = require('../middleware/auth');
 const {
   validatePersonCreation,
   validatePersonUpdate,
@@ -19,27 +19,27 @@ const {
 
 const router = express.Router();
 
-// All routes are protected
+// All routes are protected and Admin-only for manager operations
 router.use(protect);
 
-// Routes
+// Routes - Admin only for all manager operations
 router
   .route('/')
-  .get(authorize('Admin'), validatePagination, handleValidationErrors, getPersons)
-  .post(authorize('Admin'), validatePersonCreation, handleValidationErrors, createPerson);
+  .get(adminOnly, validatePagination, handleValidationErrors, getPersons)
+  .post(adminOnly, validatePersonCreation, handleValidationErrors, createPerson);
 
 router
   .route('/:id')
-  .get(validateObjectId('id'), handleValidationErrors, getPerson)
-  .put(validateObjectId('id'), validatePersonUpdate, handleValidationErrors, updatePerson)
-  .delete(authorize('Admin'), validateObjectId('id'), handleValidationErrors, deletePerson);
+  .get(validateObjectId('id'), handleValidationErrors, getPerson) // Users can view their own profile
+  .put(validateObjectId('id'), validatePersonUpdate, handleValidationErrors, updatePerson) // Users can update their own profile
+  .delete(adminOnly, validateObjectId('id'), handleValidationErrors, deletePerson);
 
 router
   .route('/:id/activate')
-  .put(authorize('Admin'), validateObjectId('id'), handleValidationErrors, activatePerson);
+  .put(adminOnly, validateObjectId('id'), handleValidationErrors, activatePerson);
 
 router
   .route('/:id/deactivate')
-  .put(authorize('Admin'), validateObjectId('id'), handleValidationErrors, deactivatePerson);
+  .put(adminOnly, validateObjectId('id'), handleValidationErrors, deactivatePerson);
 
 module.exports = router;

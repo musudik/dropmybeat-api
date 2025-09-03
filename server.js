@@ -99,7 +99,13 @@ app.use('/api/persons', require('./routes/persons'));
 app.use('/api/events', require('./routes/events'));
 app.use('/api/events/:eventId/song-requests', require('./routes/songRequests'));
 
-// Error handler
+// Role-based routes
+app.use('/api/admin', require('./routes/admin'));
+app.use('/api/manager', require('./routes/manager'));
+app.use('/api/member', require('./routes/member'));
+app.use('/api/guest', require('./routes/guest'));
+
+// Error handler middleware (must be last)
 app.use(errorHandler);
 
 // Handle unhandled routes

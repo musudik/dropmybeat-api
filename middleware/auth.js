@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const Person = require('../models/Person');
 const { asyncHandler } = require('./errorHandler');
+const ErrorResponse = require('../utils/errorResponse');
 
 // Protect routes - require authentication
 const protect = asyncHandler(async (req, res, next) => {
@@ -74,21 +75,65 @@ const optionalAuth = asyncHandler(async (req, res, next) => {
   if (token) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await Person.findById(decoded.id).select('-password');
-      
-      if (user && user.isActive) {
-        req.user = user;
-      }
+      req.user = await Person.findById(decoded.id).select('-password');
     } catch (error) {
-      // Ignore token errors for optional auth
+      // Token is invalid, but we allow the request to continue without user
+      req.user = null;
     }
   }
 
   next();
 });
 
-// Check if user is event manager or admin
-const isEventManagerOrAdmin = asyncHandler(async (req, res, next) => {
+// Guest access middleware - allows guests and authenticated users
+const guestAccess = asyncHandler(async (req, res, next) => {
+  let token;
+
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    token = req.headers.authorization.split(' ')[1];
+  }
+
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      message: 'Access denied. No token provided'
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = await Person.findById(decoded.id).select('-password');
+    
+    if (!req.user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Allow access for all roles including Guest
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid token'
+    });
+  }
+});
+
+// Admin only access - for managing managers and all events
+const adminOnly = asyncHandler(async (req, res, next) => {
+  if (req.user.role !== 'Admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Admin role required'
+    });
+  }
+  next();
+});
+
+// Manager access for their own events
+const managerEventAccess = asyncHandler(async (req, res, next) => {
   const eventId = req.params.eventId || req.params.id;
   
   if (!eventId) {
@@ -103,30 +148,37 @@ const isEventManagerOrAdmin = asyncHandler(async (req, res, next) => {
     return next();
   }
 
-  // Check if user is the event manager
-  const Event = require('../models/Event');
-  const event = await Event.findById(eventId);
-  
-  if (!event) {
-    return res.status(404).json({
-      success: false,
-      message: 'Event not found'
-    });
+  // Manager can only access their own events
+  if (req.user.role === 'Manager') {
+    const Event = require('../models/Event');
+    const event = await Event.findById(eventId);
+    
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: 'Event not found'
+      });
+    }
+
+    if (event.manager.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. You can only manage your own events'
+      });
+    }
+
+    req.event = event;
+    return next();
   }
 
-  if (event.manager.toString() !== req.user._id.toString()) {
-    return res.status(403).json({
-      success: false,
-      message: 'Not authorized to manage this event'
-    });
-  }
-
-  req.event = event;
-  next();
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied. Manager or Admin role required'
+  });
 });
 
-// Check if user is event participant
-const isEventParticipant = asyncHandler(async (req, res, next) => {
+// Member access for joined events
+const memberEventAccess = asyncHandler(async (req, res, next) => {
   const eventId = req.params.eventId || req.params.id;
   
   if (!eventId) {
@@ -152,26 +204,143 @@ const isEventParticipant = asyncHandler(async (req, res, next) => {
     return next();
   }
 
-  // Check if user is a participant
-  const isParticipant = event.participants.some(
-    p => p.user.toString() === req.user._id.toString() && p.isApproved
-  );
+  // Member must be joined to the event
+  if (req.user.role === 'Member') {
+    const isMember = event.Members.some(
+      p => p.user.toString() === req.user._id.toString() && p.isApproved
+    );
 
-  if (!isParticipant) {
-    return res.status(403).json({
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. You must join this event first'
+      });
+    }
+
+    req.event = event;
+    return next();
+  }
+
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied. Member role required'
+  });
+});
+
+// Guest access for joined events only
+const guestEventAccess = asyncHandler(async (req, res, next) => {
+  const eventId = req.params.eventId || req.params.id;
+  
+  if (!eventId) {
+    return res.status(400).json({
       success: false,
-      message: 'Not authorized to access this event'
+      message: 'Event ID is required'
     });
   }
 
-  req.event = event;
-  next();
+  const Event = require('../models/Event');
+  const event = await Event.findById(eventId);
+  
+  if (!event) {
+    return res.status(404).json({
+      success: false,
+      message: 'Event not found'
+    });
+  }
+
+  // Admin and event manager have access
+  if (req.user.role === 'Admin' || event.manager.toString() === req.user._id.toString()) {
+    req.event = event;
+    return next();
+  }
+
+  // Guest must be joined to the event
+  if (req.user.role === 'Guest') {
+    const isMember = event.Members.some(
+      p => p.user.toString() === req.user._id.toString() && p.isApproved
+    );
+
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. You must join this event first'
+      });
+    }
+
+    req.event = event;
+    return next();
+  }
+
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied. Guest role required'
+  });
 });
+
+// Combined event access for Members and Guests (for song requests, likes)
+const eventParticipantAccess = asyncHandler(async (req, res, next) => {
+  const eventId = req.params.eventId || req.params.id;
+  
+  if (!eventId) {
+    return res.status(400).json({
+      success: false,
+      message: 'Event ID is required'
+    });
+  }
+
+  const Event = require('../models/Event');
+  const event = await Event.findById(eventId);
+  
+  if (!event) {
+    return res.status(404).json({
+      success: false,
+      message: 'Event not found'
+    });
+  }
+
+  // Admin and event manager have access
+  if (req.user.role === 'Admin' || event.manager.toString() === req.user._id.toString()) {
+    req.event = event;
+    return next();
+  }
+
+  // Members and Guests must be joined to the event
+  if (req.user.role === 'Member' || req.user.role === 'Guest') {
+    const isMember = event.Members.some(
+      p => p.user.toString() === req.user._id.toString() && p.isApproved
+    );
+
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. You must join this event first'
+      });
+    }
+
+    req.event = event;
+    return next();
+  }
+
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied. Member or Guest role required'
+  });
+});
+
+// Legacy middleware for backward compatibility
+const isEventManagerOrAdmin = managerEventAccess;
+const isEventParticipant = eventParticipantAccess;
 
 module.exports = {
   protect,
   authorize,
   optionalAuth,
+  guestAccess,
+  adminOnly,
+  managerEventAccess,
+  memberEventAccess,
+  guestEventAccess,
+  eventParticipantAccess,
   isEventManagerOrAdmin,
   isEventParticipant
 };

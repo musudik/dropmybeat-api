@@ -5,7 +5,8 @@ const bcrypt = require('bcryptjs');
 const Role = {
   ADMIN: 'Admin',
   MANAGER: 'Manager',
-  PARTICIPANT: 'Participant'
+  MEMBER: 'Member',
+  GUEST: 'Guest'
 };
 
 const personSchema = new mongoose.Schema({
@@ -38,7 +39,7 @@ const personSchema = new mongoose.Schema({
   role: {
     type: String,
     enum: Object.values(Role),
-    default: Role.PARTICIPANT,
+    default: Role.MEMBER,
     required: true
   },
   isActive: {
@@ -63,7 +64,7 @@ const personSchema = new mongoose.Schema({
     trim: true,
     maxlength: [100, 'Organization name cannot exceed 100 characters']
   },
-  // Participant-specific fields
+  // Member-specific fields
   favoriteGenres: [{
     type: String,
     trim: true

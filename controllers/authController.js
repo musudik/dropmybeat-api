@@ -23,7 +23,7 @@ const register = asyncHandler(async (req, res) => {
     lastName,
     email,
     password,
-    role: role || 'Participant',
+    role: role || 'Member',
     phoneNumber,
     createdBy: req.user ? req.user._id : null
   };
@@ -193,10 +193,66 @@ const logout = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Guest login (no password required)
+// @route   POST /api/auth/guest-login
+// @access  Public
+const guestLogin = asyncHandler(async (req, res, next) => {
+  const { email, role } = req.body;
+
+  // Validation
+  if (!email || !role) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please provide email and role'
+    });
+  }
+
+  // Validate role (should be Guest)
+  if (role !== 'Guest') {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid role. Only Guest role is allowed for guest login'
+    });
+  }
+
+  // Check if guest user already exists
+  let user = await Person.findOne({ email, role: 'Guest' });
+
+  if (!user) {
+    // Create new guest user with minimal info
+    user = await Person.create({
+      email,
+      role: 'Guest',
+      firstName: 'Guest',
+      lastName: 'User',
+      password: 'guest-no-password', // Placeholder password
+      isActive: true
+    });
+  } else {
+    // Update login tracking for existing guest
+    user.lastLogin = new Date();
+    user.loginCount += 1;
+    await user.save();
+  }
+
+  // Generate JWT token
+  const token = generateToken({ id: user._id });
+
+  res.status(200).json({
+    success: true,
+    message: 'Guest login successful',
+    data: {
+      user: user.getPublicProfile(),
+      token
+    }
+  });
+});
+
 module.exports = {
   register,
   login,
   getMe,
+  guestLogin,
   updateProfile,
   changePassword,
   logout

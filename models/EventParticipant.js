@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const eventParticipantSchema = new mongoose.Schema({
+const EventParticipantSchema = new mongoose.Schema({
   event: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Event',
@@ -40,25 +40,25 @@ const eventParticipantSchema = new mongoose.Schema({
 });
 
 // Create compound unique index for email and lastName per event
-eventParticipantSchema.index({ event: 1, email: 1, lastName: 1 }, { unique: true });
+EventParticipantSchema.index({ event: 1, email: 1, lastName: 1 }, { unique: true });
 
 // Additional indexes for performance
-eventParticipantSchema.index({ event: 1 });
-eventParticipantSchema.index({ email: 1 });
-eventParticipantSchema.index({ createdAt: -1 });
+EventParticipantSchema.index({ event: 1 });
+EventParticipantSchema.index({ email: 1 });
+EventParticipantSchema.index({ createdAt: -1 });
 
 // Virtual for full name
-eventParticipantSchema.virtual('fullName').get(function() {
+EventParticipantSchema.virtual('fullName').get(function() {
   return `${this.firstName} ${this.lastName}`;
 });
 
-// Static method to find participants by event
-eventParticipantSchema.statics.findByEvent = function(eventId) {
+// Static method to find Members by event
+EventParticipantSchema.statics.findByEvent = function(eventId) {
   return this.find({ event: eventId }).populate('event', 'name startDate endDate');
 };
 
-// Static method to check if participant already exists
-eventParticipantSchema.statics.participantExists = function(eventId, email, lastName) {
+// Static method to check if Member already exists
+EventParticipantSchema.statics.MemberExists = function(eventId, email, lastName) {
   return this.findOne({ 
     event: eventId, 
     email: email.toLowerCase(), 
@@ -66,4 +66,4 @@ eventParticipantSchema.statics.participantExists = function(eventId, email, last
   });
 };
 
-module.exports = mongoose.model('EventParticipant', eventParticipantSchema);
+module.exports = mongoose.model('EventParticipant', EventParticipantSchema);

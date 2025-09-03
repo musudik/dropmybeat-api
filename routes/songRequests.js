@@ -13,7 +13,12 @@ const {
   getEventStats
 } = require('../controllers/songRequestController');
 
-const { protect, authorize, optionalAuth, isEventManagerOrAdmin } = require('../middleware/auth');
+const { 
+  protect, 
+  optionalAuth, 
+  eventParticipantAccess,
+  managerEventAccess
+} = require('../middleware/auth');
 const {
   validateSongRequest,
   validateSongRequestUpdate,
@@ -23,37 +28,37 @@ const {
 
 const router = express.Router({ mergeParams: true });
 
-// Public/Protected routes (depending on event visibility)
+// Public/Protected routes (Members and Guests who joined events)
 router.route('/')
   .get(optionalAuth, validatePagination, getSongRequests)
-  .post(protect, validateSongRequest, createSongRequest);
+  .post(protect, eventParticipantAccess, validateSongRequest, createSongRequest);
 
 router.route('/:id')
   .get(optionalAuth, validateObjectId('id'), getSongRequest)
-  .put(protect, validateObjectId('id'), validateSongRequestUpdate, updateSongRequest)
-  .delete(protect, validateObjectId('id'), deleteSongRequest);
+  .put(protect, eventParticipantAccess, validateObjectId('id'), validateSongRequestUpdate, updateSongRequest)
+  .delete(protect, eventParticipantAccess, validateObjectId('id'), deleteSongRequest);
 
-// Song interaction routes
-router.post('/:id/like', protect, validateObjectId('id'), toggleLike);
+// Song interaction routes (Members and Guests who joined events)
+router.post('/:id/like', protect, eventParticipantAccess, validateObjectId('id'), toggleLike);
 
 // Manager-only routes
 router.post('/:id/approve', 
   protect, 
-  isEventManagerOrAdmin, 
+  managerEventAccess, 
   validateObjectId('id'), 
   approveSongRequest
 );
 
 router.post('/:id/reject', 
   protect, 
-  isEventManagerOrAdmin, 
+  managerEventAccess, 
   validateObjectId('id'), 
   rejectSongRequest
 );
 
-// Event-specific routes
+// Event management routes (Manager/Admin only)
 router.get('/queue', optionalAuth, getEventQueue);
-router.get('/timebombs', protect, isEventManagerOrAdmin, getTimeBombs);
-router.get('/stats', protect, isEventManagerOrAdmin, getEventStats);
+router.get('/timebombs', protect, managerEventAccess, getTimeBombs);
+router.get('/stats', protect, managerEventAccess, getEventStats);
 
 module.exports = router;

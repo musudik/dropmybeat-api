@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "DropMyBeats API",
-    "description": "Complete API collection for DropMyBeats backend",
+    "description": "Complete API collection for DropMyBeats backend with Role-Based Access Control",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -26,6 +26,11 @@
       "type": "string"
     },
     {
+      "key": "guestToken",
+      "value": "",
+      "type": "string"
+    },
+    {
       "key": "userId",
       "value": "",
       "type": "string"
@@ -37,6 +42,11 @@
     },
     {
       "key": "songRequestId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "MemberId",
       "value": "",
       "type": "string"
     }
@@ -57,7 +67,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"email\": \"test@example.com\",\n  \"password\": \"Test123!\",\n  \"role\": \"Participant\"\n}"
+              "raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"email\": \"test@example.com\",\n  \"password\": \"Test123!\",\n  \"role\": \"Member\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/register",
@@ -116,6 +126,41 @@
           ]
         },
         {
+          "name": "Guest Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"guest@example.com\",\n  \"firstName\": \"Guest\",\n  \"lastName\": \"User\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/guest-login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "guest-login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('guestToken', response.token);",
+                  "    pm.collectionVariables.set('userId', response.data._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Get Current User",
           "request": {
             "method": "GET",
@@ -142,9 +187,9 @@
               "raw": "{\n  \"firstName\": \"Updated\",\n  \"lastName\": \"Name\",\n  \"phoneNumber\": \"+1987654321\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/auth/updateprofile",
+              "raw": "{{baseUrl}}/auth/profile",
               "host": ["{{baseUrl}}"],
-              "path": ["auth", "updateprofile"]
+              "path": ["auth", "profile"]
             }
           }
         },
@@ -163,9 +208,9 @@
               "raw": "{\n  \"currentPassword\": \"Admin123!\",\n  \"newPassword\": \"NewAdmin123!\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/auth/changepassword",
+              "raw": "{{baseUrl}}/auth/change-password",
               "host": ["{{baseUrl}}"],
-              "path": ["auth", "changepassword"]
+              "path": ["auth", "change-password"]
             }
           }
         },
@@ -184,6 +229,170 @@
       ]
     },
     {
+      "name": "Admin Dashboard",
+      "item": [
+        {
+          "name": "Get Admin Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "dashboard"]
+            }
+          }
+        },
+        {
+          "name": "Get All Managers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/managers",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "managers"]
+            }
+          }
+        },
+        {
+          "name": "Get System Analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/analytics",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "analytics"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Manager Dashboard",
+      "item": [
+        {
+          "name": "Get Manager Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/manager/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["manager", "dashboard"]
+            }
+          }
+        },
+        {
+          "name": "Get Manager Events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/manager/events",
+              "host": ["{{baseUrl}}"],
+              "path": ["manager", "events"]
+            }
+          }
+        },
+        {
+          "name": "Get Event Analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/manager/events/{{eventId}}/analytics",
+              "host": ["{{baseUrl}}"],
+              "path": ["manager", "events", "{{eventId}}", "analytics"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Member Dashboard",
+      "item": [
+        {
+          "name": "Get Member Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/member/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["member", "dashboard"]
+            }
+          }
+        },
+        {
+          "name": "Get Member Events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/member/events",
+              "host": ["{{baseUrl}}"],
+              "path": ["member", "events"]
+            }
+          }
+        },
+        {
+          "name": "Get Member Song Requests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/member/song-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["member", "song-requests"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Guest Dashboard",
+      "item": [
+        {
+          "name": "Get Guest Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/guest/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["guest", "dashboard"]
+            }
+          }
+        },
+        {
+          "name": "Get Guest Events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/guest/events",
+              "host": ["{{baseUrl}}"],
+              "path": ["guest", "events"]
+            }
+          }
+        },
+        {
+          "name": "Get Guest Song Requests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/guest/song-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["guest", "song-requests"]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Person Management",
       "item": [
         {
@@ -192,7 +401,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/persons?page=1&limit=10&role=Participant",
+              "raw": "{{baseUrl}}/persons?page=1&limit=10&role=Member",
               "host": ["{{baseUrl}}"],
               "path": ["persons"],
               "query": [
@@ -206,7 +415,7 @@
                 },
                 {
                   "key": "role",
-                  "value": "Participant"
+                  "value": "Member"
                 }
               ]
             }
@@ -236,7 +445,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"New\",\n  \"lastName\": \"Person\",\n  \"email\": \"newperson@example.com\",\n  \"password\": \"NewPerson123!\",\n  \"role\": \"Participant\",\n  \"phoneNumber\": \"+1555666777\"\n}"
+              "raw": "{\n  \"firstName\": \"New\",\n  \"lastName\": \"Person\",\n  \"email\": \"newperson@example.com\",\n  \"password\": \"NewPerson123!\",\n  \"role\": \"Member\",\n  \"phoneNumber\": \"+1555666777\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/persons",
@@ -346,7 +555,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Test Event\",\n  \"description\": \"This is a test event created via Postman\",\n  \"startTime\": \"2024-12-31T20:00:00Z\",\n  \"endTime\": \"2024-12-31T23:59:00Z\",\n  \"location\": \"Test Venue\",\n  \"maxParticipants\": 100,\n  \"isPublic\": true,\n  \"allowSongRequests\": true,\n  \"timeBombEnabled\": true,\n  \"timeBombDuration\": 300\n}"
+              "raw": "{\n  \"name\": \"Test Event\",\n  \"description\": \"This is a test event created via Postman\",\n  \"startDate\": \"2024-12-31T20:00:00Z\",\n  \"endDate\": \"2024-12-31T23:59:00Z\",\n  \"venue\": {\n    \"name\": \"Test Venue\",\n    \"address\": \"123 Test St\",\n    \"city\": \"Test City\",\n    \"state\": \"TS\",\n    \"zipCode\": \"12345\"\n  },\n  \"maxMembers\": 100,\n  \"isPublic\": true,\n  \"requiresApproval\": false,\n  \"maxSongsPerUser\": 5,\n  \"allowDuplicates\": false,\n  \"timeBombEnabled\": true,\n  \"timeBombDuration\": 300\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/events",
@@ -380,12 +589,36 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Updated Test Event\",\n  \"description\": \"This event has been updated\",\n  \"maxParticipants\": 150\n}"
+              "raw": "{\n  \"name\": \"Updated Test Event\",\n  \"description\": \"This event has been updated\",\n  \"maxMembers\": 150\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/events/{{eventId}}",
               "host": ["{{baseUrl}}"],
               "path": ["events", "{{eventId}}"]
+            }
+          }
+        },
+        {
+          "name": "Activate Event",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/activate",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}", "activate"]
+            }
+          }
+        },
+        {
+          "name": "Deactivate Event",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/deactivate",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}", "deactivate"]
             }
           }
         },
@@ -402,6 +635,40 @@
           }
         },
         {
+          "name": "Join Event as Guest (No Auth)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"guest@example.com\",\n  \"firstName\": \"Guest\",\n  \"lastName\": \"User\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/join-guest",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}", "join-guest"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('MemberId', response.data.Member._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Leave Event",
           "request": {
             "method": "POST",
@@ -410,6 +677,30 @@
               "raw": "{{baseUrl}}/events/{{eventId}}/leave",
               "host": ["{{baseUrl}}"],
               "path": ["events", "{{eventId}}", "leave"]
+            }
+          }
+        },
+        {
+          "name": "Get Event Members",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/Members",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}", "Members"]
+            }
+          }
+        },
+        {
+          "name": "Get Event Guest Members",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/guest-Members",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}", "guest-Members"]
             }
           }
         },
@@ -468,7 +759,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Test Song\",\n  \"artist\": \"Test Artist\",\n  \"album\": \"Test Album\",\n  \"genre\": \"Pop\",\n  \"duration\": 180,\n  \"spotifyId\": \"test123\",\n  \"eventId\": \"{{eventId}}\"\n}"
+              "raw": "{\n  \"title\": \"Test Song\",\n  \"artist\": \"Test Artist\",\n  \"album\": \"Test Album\",\n  \"genre\": \"Pop\",\n  \"duration\": 180,\n  \"spotifyId\": \"test123\",\n  \"message\": \"Please play this song!\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/events/{{eventId}}/song-requests",
@@ -580,7 +871,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"reason\": \"Not suitable for this event\"\n}"
+              "raw": "{\n  \"reason\": \"Inappropriate content\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/events/{{eventId}}/song-requests/{{songRequestId}}/reject",
@@ -590,7 +881,7 @@
           }
         },
         {
-          "name": "Get Event Queue",
+          "name": "Get Event Queue (Manager/Admin)",
           "request": {
             "method": "GET",
             "header": [],
@@ -602,7 +893,19 @@
           }
         },
         {
-          "name": "Get Event Stats",
+          "name": "Get TimeBombs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/events/{{eventId}}/song-requests/timebombs",
+              "host": ["{{baseUrl}}"],
+              "path": ["events", "{{eventId}}", "song-requests", "timebombs"]
+            }
+          }
+        },
+        {
+          "name": "Get Event Stats (Manager/Admin)",
           "request": {
             "method": "GET",
             "header": [],
@@ -622,25 +925,6 @@
               "raw": "{{baseUrl}}/events/{{eventId}}/song-requests/{{songRequestId}}",
               "host": ["{{baseUrl}}"],
               "path": ["events", "{{eventId}}", "song-requests", "{{songRequestId}}"]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Health Check",
-      "item": [
-        {
-          "name": "Server Health",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "http://localhost:5000/health",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "5000",
-              "path": ["health"]
             }
           }
         }

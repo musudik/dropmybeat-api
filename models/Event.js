@@ -94,10 +94,10 @@ const eventSchema = new mongoose.Schema({
     required: [true, 'Event manager is required']
   },
   // Event settings
-  maxParticipants: {
+  maxMembers: {
     type: Number,
-    min: [1, 'Maximum participants must be at least 1'],
-    max: [10000, 'Maximum participants cannot exceed 10000']
+    min: [1, 'Maximum Members must be at least 1'],
+    max: [10000, 'Maximum Members cannot exceed 10000']
   },
   isPublic: {
     type: Boolean,
@@ -145,8 +145,8 @@ const eventSchema = new mongoose.Schema({
     minlength: [4, 'Access code must be at least 4 characters'],
     maxlength: [20, 'Access code cannot exceed 20 characters']
   },
-  // Participants
-  participants: [{
+  // Members
+  Members: [{
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Person',
@@ -186,9 +186,9 @@ const eventSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Virtual for participant count
-eventSchema.virtual('participantCount').get(function() {
-  return this.participants ? this.participants.length : 0;
+// Virtual for Member count
+eventSchema.virtual('MemberCount').get(function() {
+  return this.Members ? this.Members.length : 0;
 });
 
 // Virtual for active status (temporary - for testing only)
@@ -210,7 +210,7 @@ eventSchema.index({ startDate: 1 });
 eventSchema.index({ endDate: 1 });
 eventSchema.index({ eventType: 1 });
 eventSchema.index({ isPublic: 1 });
-eventSchema.index({ 'participants.user': 1 });
+eventSchema.index({ 'Members.user': 1 });
 eventSchema.index({ createdAt: -1 });
 
 // Compound indexes
@@ -233,16 +233,16 @@ eventSchema.pre('save', function(next) {
 });
 
 // Instance methods
-eventSchema.methods.addParticipant = function(userId, isApproved = true) {
-  const existingParticipant = this.participants.find(
+eventSchema.methods.addMember = function(userId, isApproved = true) {
+  const existingMember = this.Members.find(
     p => p.user.toString() === userId.toString()
   );
   
-  if (existingParticipant) {
-    throw new Error('User is already a participant');
+  if (existingMember) {
+    throw new Error('User is already a Member');
   }
   
-  this.participants.push({
+  this.Members.push({
     user: userId,
     isApproved,
     joinedAt: new Date()
@@ -251,16 +251,16 @@ eventSchema.methods.addParticipant = function(userId, isApproved = true) {
   return this.save();
 };
 
-eventSchema.methods.removeParticipant = function(userId) {
-  this.participants = this.participants.filter(
+eventSchema.methods.removeMember = function(userId) {
+  this.Members = this.Members.filter(
     p => p.user.toString() !== userId.toString()
   );
   
   return this.save();
 };
 
-eventSchema.methods.isParticipant = function(userId) {
-  return this.participants.some(
+eventSchema.methods.isMember = function(userId) {
+  return this.Members.some(
     p => p.user.toString() === userId.toString() && p.isApproved
   );
 };
