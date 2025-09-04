@@ -284,6 +284,26 @@ songRequestSchema.methods.hasUserLiked = function(userId) {
   );
 };
 
+// Add the missing toggleLike method
+songRequestSchema.methods.toggleLike = function(userId) {
+  const hasLiked = this.hasUserLiked(userId);
+  
+  if (hasLiked) {
+    // Remove like
+    this.likes = this.likes.filter(
+      like => like.user.toString() !== userId.toString()
+    );
+    return this.save().then(() => ({ action: 'unliked', hasLiked: false }));
+  } else {
+    // Add like
+    this.likes.push({
+      user: userId,
+      likedAt: new Date()
+    });
+    return this.save().then(() => ({ action: 'liked', hasLiked: true }));
+  }
+};
+
 songRequestSchema.methods.approve = function(approvedBy) {
   this.status = SongStatus.APPROVED;
   this.updatedBy = approvedBy;

@@ -131,11 +131,11 @@ const eventSchema = new mongoose.Schema({
   },
   // Media
   logo: {
-    type: String, // S3 URL
+    type: mongoose.Schema.Types.ObjectId, // GridFS file ID
     default: null
   },
   bannerImage: {
-    type: String, // S3 URL
+    type: mongoose.Schema.Types.ObjectId, // GridFS file ID
     default: null
   },
   // Access control

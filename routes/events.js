@@ -8,10 +8,16 @@ const {
   activateEvent,
   deactivateEvent,
   joinEvent,
+  joinEventAsGuest,
+  getEventGuestMembers,
   leaveEvent,
   getEventParticipants,
-  joinEventAsGuest,
-  getEventGuestMembers
+  uploadEventLogo,
+  uploadEventBanner,
+  getEventLogo,
+  getEventBanner,
+  deleteEventLogo,
+  deleteEventBanner
 } = require('../controllers/eventController');
 const { createSongRequest } = require('../controllers/songRequestController');
 const { 
@@ -30,6 +36,7 @@ const {
   validateSongRequest,
   handleValidationErrors
 } = require('../middleware/validation');
+const { upload } = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -85,5 +92,13 @@ router.post('/:eventId/song-requests',
   handleValidationErrors, 
   createSongRequest
 );
+
+// Image upload routes
+router.post('/:id/upload-logo', protect, upload.single('logo'), uploadEventLogo);
+router.post('/:id/upload-banner', protect, upload.single('banner'), uploadEventBanner);
+router.get('/:id/logo', getEventLogo);
+router.get('/:id/banner', getEventBanner);
+router.delete('/:id/logo', protect, deleteEventLogo);
+router.delete('/:id/banner', protect, deleteEventBanner);
 
 module.exports = router;

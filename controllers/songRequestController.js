@@ -18,8 +18,9 @@ exports.getSongRequests = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse('Event not found', 404));
   }
 
-  // Check access permissions
-  if (!event.isPublic && (!req.user || !event.Members.includes(req.user.id))) {
+  // Check access permissions - fix membership check
+  const isMember = event.Members.some(member => member.user.toString() === req.user?.id);
+  if (!event.isPublic && (!req.user || !isMember)) {
     return next(new ErrorResponse('Access denied to this event', 403));
   }
 
@@ -126,15 +127,14 @@ exports.createSongRequest = asyncHandler(async (req, res, next) => {
   const isAdmin = user.role === 'Admin';
   const isManager = user.role === 'Manager';
   const isGuest = user.role === 'Guest';
-  const isEventManager = event.manager.toString() === req.user.id;
-  const isRegularMember = event.Members.includes(req.user.id);
+  const isMember = user.role === 'Member';
   const isGuestMember = await EventParticipant.findOne({
     event: eventId,
     email: req.user.email,
     isApproved: true
   });
 
-  if (!isAdmin && !isManager && !isEventManager && !isRegularMember && !isGuestMember && !isGuest) {
+  if (!isAdmin && !isManager && !isMember  && !isGuestMember && !isGuest) {
     return next(new ErrorResponse('You must be a Member to request songs', 403));
   }
 
@@ -298,7 +298,12 @@ exports.toggleLike = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse('Event not found', 404));
   }
 
-  if (!event.Members.includes(req.user.id)) {
+  // Fix membership check to properly check the Members array
+  const isMember = event.Members.some(member => 
+    member.user.toString() === req.user.id && member.isApproved
+  );
+  
+  if (!isMember) {
     return next(new ErrorResponse('You must be a Member to like songs', 403));
   }
 
@@ -418,7 +423,9 @@ exports.getEventQueue = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse('Event not found', 404));
   }
 
-  if (!event.isPublic && (!req.user || !event.Members.includes(req.user.id))) {
+  // Fix membership check
+  const isMember = event.Members.some(member => member.user.toString() === req.user?.id);
+  if (!event.isPublic && (!req.user || !isMember)) {
     return next(new ErrorResponse('Access denied to this event', 403));
   }
 

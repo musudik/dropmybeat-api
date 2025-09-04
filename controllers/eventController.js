@@ -3,6 +3,7 @@ const Person = require('../models/Person');
 const asyncHandler = require('../utils/asyncHandler');
 const ErrorResponse = require('../utils/errorResponse');
 const EventParticipant = require('../models/EventParticipant');
+const { uploadToGridFS, getImageFromGridFS, deleteImageFromGridFS } = require('../middleware/upload');
 
 // @desc    Get all events
 // @route   GET /api/events
@@ -520,4 +521,314 @@ exports.getEventParticipants = asyncHandler(async (req, res, next) => {
     count: event.Members.length,
     data: event.Members
   });
+});
+
+// @desc    Upload event logo
+// @route   POST /api/events/:id/upload-logo
+// @access  Private/Manager of event or Admin
+exports.uploadEventLogo = asyncHandler(async (req, res, next) => {
+  const event = await Event.findById(req.params.id);
+  
+  if (!event) {
+    return next(new ErrorResponse('Event not found', 404));
+  }
+  
+  // Check if user can upload logo for this event
+  if (req.user.role !== 'Admin' && req.user.id !== event.manager.toString()) {
+    return next(new ErrorResponse('Not authorized to upload logo for this event', 403));
+  }
+  
+  if (!req.file) {
+    return next(new ErrorResponse('Please upload an image file', 400));
+  }
+  
+  try {
+    // Delete existing logo if it exists
+    if (event.logo) {
+      try {
+        await deleteImageFromGridFS(event.logo);
+      } catch (deleteError) {
+        console.log('Could not delete existing logo:', deleteError.message);
+        // Continue with upload even if deletion fails
+      }
+    }
+    
+    // Upload new logo to GridFS
+    const filename = `logo-${event._id}-${Date.now()}`;
+    const fileId = await uploadToGridFS(req.file, filename);
+    
+    // Update event with new logo file ID
+    event.logo = fileId;
+    await event.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Logo uploaded successfully',
+      data: {
+        eventId: event._id,
+        logoId: fileId
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error uploading logo:', error);
+    return next(new ErrorResponse('Error uploading logo image', 500));
+  }
+});
+
+// @desc    Upload event banner
+// @route   POST /api/events/:id/upload-banner
+// @access  Private/Manager of event or Admin
+exports.uploadEventBanner = asyncHandler(async (req, res, next) => {
+  const event = await Event.findById(req.params.id);
+  
+  if (!event) {
+    return next(new ErrorResponse('Event not found', 404));
+  }
+  
+  // Check if user can upload banner for this event
+  if (req.user.role !== 'Admin' && req.user.id !== event.manager.toString()) {
+    return next(new ErrorResponse('Not authorized to upload banner for this event', 403));
+  }
+  
+  if (!req.file) {
+    return next(new ErrorResponse('Please upload an image file', 400));
+  }
+  
+  try {
+    // Delete existing banner if it exists
+    if (event.bannerImage) {
+      try {
+        await deleteImageFromGridFS(event.bannerImage);
+      } catch (deleteError) {
+        console.log('Could not delete existing banner:', deleteError.message);
+        // Continue with upload even if deletion fails
+      }
+    }
+    
+    // Upload new banner to GridFS
+    const filename = `banner-${event._id}-${Date.now()}`;
+    const fileId = await uploadToGridFS(req.file, filename);
+    
+    // Update event with new banner file ID
+    event.bannerImage = fileId;
+    await event.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Banner uploaded successfully',
+      data: {
+        eventId: event._id,
+        bannerId: fileId
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error uploading banner:', error);
+    return next(new ErrorResponse('Error uploading banner image', 500));
+  }
+});
+
+// @desc    Get event logo
+// @route   GET /api/events/:id/logo
+// @access  Public
+exports.getEventLogo = asyncHandler(async (req, res, next) => {
+  const event = await Event.findById(req.params.id);
+  
+  if (!event || !event.logo) {
+    return next(new ErrorResponse('Logo not found', 404));
+  }
+  
+  try {
+    // Convert to ObjectId if it's a string
+    const mongoose = require('mongoose');
+    let fileId;
+    
+    try {
+      fileId = new mongoose.Types.ObjectId(event.logo);
+    } catch (conversionError) {
+      console.error('Invalid ObjectId for logo:', event.logo);
+      return next(new ErrorResponse('Invalid logo file reference', 400));
+    }
+    
+    // First check if file exists in GridFS
+    const bucket = require('../middleware/upload').bucket();
+    
+    if (!bucket) {
+      return next(new ErrorResponse('File storage not available', 500));
+    }
+    
+    const file = await bucket.find({ _id: fileId }).toArray();
+    
+    if (file.length === 0) {
+      console.error(`Logo file not found in GridFS for ID: ${fileId}`);
+      return next(new ErrorResponse('Logo file not found', 404));
+    }
+    
+    // Stream the file directly instead of loading into buffer
+    const downloadStream = bucket.openDownloadStream(fileId);
+    
+    downloadStream.on('error', (error) => {
+      console.error('Error streaming logo file:', error);
+      if (!res.headersSent) {
+        return next(new ErrorResponse('Error retrieving logo image', 500));
+      }
+    });
+    
+    // Set headers
+    res.set('Content-Type', file[0].metadata?.mimetype || 'image/jpeg');
+    res.set('Content-Length', file[0].length);
+    
+    // Pipe the stream directly to response
+    downloadStream.pipe(res);
+    
+  } catch (error) {
+    console.error('Error retrieving logo:', error);
+    
+    // Handle specific GridFS errors
+    if (error.message && error.message.includes('FileNotFound')) {
+      return next(new ErrorResponse('Logo file not found', 404));
+    }
+    
+    if (error.name === 'CastError' || error.message.includes('not found')) {
+      return next(new ErrorResponse('Logo file not found', 404));
+    }
+    
+    return next(new ErrorResponse('Error retrieving logo image', 500));
+  }
+});
+
+// @desc    Get event banner
+// @route   GET /api/events/:id/banner
+// @access  Public
+exports.getEventBanner = asyncHandler(async (req, res, next) => {
+  const event = await Event.findById(req.params.id);
+  
+  if (!event || !event.bannerImage) {
+    return next(new ErrorResponse('Banner not found', 404));
+  }
+  
+  try {
+    // Convert to ObjectId if it's a string
+    const mongoose = require('mongoose');
+    let fileId;
+    
+    try {
+      fileId = new mongoose.Types.ObjectId(event.bannerImage);
+    } catch (conversionError) {
+      console.error('Invalid ObjectId for banner:', event.bannerImage);
+      return next(new ErrorResponse('Invalid banner file reference', 400));
+    }
+    
+    // First check if file exists in GridFS
+    const bucket = require('../middleware/upload').bucket();
+    
+    if (!bucket) {
+      return next(new ErrorResponse('File storage not available', 500));
+    }
+    
+    const file = await bucket.find({ _id: fileId }).toArray();
+    
+    if (file.length === 0) {
+      console.error(`Banner file not found in GridFS for ID: ${fileId}`);
+      return next(new ErrorResponse('Banner file not found', 404));
+    }
+    
+    // Stream the file directly instead of loading into buffer
+    const downloadStream = bucket.openDownloadStream(fileId);
+    
+    downloadStream.on('error', (error) => {
+      console.error('Error streaming banner file:', error);
+      if (!res.headersSent) {
+        return next(new ErrorResponse('Error retrieving banner image', 500));
+      }
+    });
+    
+    // Set headers
+    res.set('Content-Type', file[0].metadata?.mimetype || 'image/jpeg');
+    res.set('Content-Length', file[0].length);
+    
+    // Pipe the stream directly to response
+    downloadStream.pipe(res);
+    
+  } catch (error) {
+    console.error('Error retrieving banner:', error);
+    
+    // Handle specific GridFS errors
+    if (error.message && error.message.includes('FileNotFound')) {
+      return next(new ErrorResponse('Banner file not found', 404));
+    }
+    
+    if (error.name === 'CastError' || error.message.includes('not found')) {
+      return next(new ErrorResponse('Banner file not found', 404));
+    }
+    
+    return next(new ErrorResponse('Error retrieving banner image', 500));
+  }
+});
+
+// @desc    Delete event logo
+// @route   DELETE /api/events/:id/logo
+// @access  Private/Manager of event or Admin
+exports.deleteEventLogo = asyncHandler(async (req, res, next) => {
+  const event = await Event.findById(req.params.id);
+  
+  if (!event) {
+    return next(new ErrorResponse('Event not found', 404));
+  }
+  
+  // Check if user can delete logo for this event
+  if (req.user.role !== 'Admin' && req.user.id !== event.manager.toString()) {
+    return next(new ErrorResponse('Not authorized to delete logo for this event', 403));
+  }
+  
+  if (!event.logo) {
+    return next(new ErrorResponse('No logo to delete', 404));
+  }
+  
+  try {
+    await deleteImageFromGridFS(event.logo);
+    event.logo = null;
+    await event.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Logo deleted successfully'
+    });
+  } catch (error) {
+    return next(new ErrorResponse('Error deleting logo', 500));
+  }
+});
+
+// @desc    Delete event banner
+// @route   DELETE /api/events/:id/banner
+// @access  Private/Manager of event or Admin
+exports.deleteEventBanner = asyncHandler(async (req, res, next) => {
+  const event = await Event.findById(req.params.id);
+  
+  if (!event) {
+    return next(new ErrorResponse('Event not found', 404));
+  }
+  
+  // Check if user can delete banner for this event
+  if (req.user.role !== 'Admin' && req.user.id !== event.manager.toString()) {
+    return next(new ErrorResponse('Not authorized to delete banner for this event', 403));
+  }
+  
+  if (!event.bannerImage) {
+    return next(new ErrorResponse('No banner to delete', 404));
+  }
+  
+  try {
+    await deleteImageFromGridFS(event.bannerImage);
+    event.bannerImage = null;
+    await event.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Banner deleted successfully'
+    });
+  } catch (error) {
+    return next(new ErrorResponse('Error deleting banner', 500));
+  }
 });
