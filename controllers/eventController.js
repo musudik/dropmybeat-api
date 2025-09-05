@@ -41,12 +41,25 @@ exports.getEvents = asyncHandler(async (req, res, next) => {
         query.isPublic = true;
         break;
       case 'Guest':
-        // Guest can only see events they've joined
+        // Guest can see events they've joined as registered members OR as guest participants
         const joinedEvents = await Event.find({
           'Members.user': req.user.id,
           'Members.isApproved': true
         }).select('_id');
-        query._id = { $in: joinedEvents.map(e => e._id) };
+        
+        // Also get events where user participated as guest
+        const guestParticipations = await EventParticipant.find({ 
+          $or: [
+            { user: req.user.id },
+            { email: req.user.email }
+          ],
+          isApproved: true
+        }).select('event');
+        
+        const guestEventIds = guestParticipations.map(gp => gp.event);
+        const allEventIds = [...joinedEvents.map(e => e._id), ...guestEventIds];
+        
+        query._id = { $in: allEventIds };
         break;
       default:
         query.isPublic = true;

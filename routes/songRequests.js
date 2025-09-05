@@ -10,7 +10,9 @@ const {
   rejectSongRequest,
   getEventQueue,
   getTimeBombs,
-  getEventStats
+  getEventStats,
+  markSongAsPlayed,
+  removeSongFromList
 } = require('../controllers/songRequestController');
 
 const { 
@@ -27,6 +29,19 @@ const {
 } = require('../middleware/validation');
 
 const router = express.Router({ mergeParams: true });
+
+// Grant access to specific roles
+const authorize = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: `User role ${req.user.role} is not authorized to access this route`
+      });
+    }
+    next();
+  };
+};
 
 // Public/Protected routes (Members and Guests who joined events)
 router.route('/')
@@ -60,5 +75,19 @@ router.post('/:id/reject',
 router.get('/queue', optionalAuth, getEventQueue);
 router.get('/timebombs', protect, managerEventAccess, getTimeBombs);
 router.get('/stats', protect, managerEventAccess, getEventStats);
+
+// Mark song as played (Admin/Manager only)
+router.put('/:eventId/song-requests/:id/mark-played', 
+  protect, 
+  authorize('Admin', 'Manager'), 
+  markSongAsPlayed
+);
+
+// Remove song from list (Admin/Manager only)
+router.delete('/:eventId/song-requests/:id/remove', 
+  protect, 
+  authorize('Admin', 'Manager'), 
+  removeSongFromList
+);
 
 module.exports = router;

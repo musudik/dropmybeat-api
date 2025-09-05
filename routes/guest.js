@@ -5,6 +5,7 @@ const {
   getGuestSongRequests
 } = require('../controllers/guestController');
 const { protect, authorize } = require('../middleware/auth');
+const { getEvents } = require('../controllers/eventController');
 
 const router = express.Router();
 
@@ -12,7 +13,7 @@ const router = express.Router();
 router.use(protect, authorize('Guest'));
 
 router.get('/dashboard', getGuestDashboard);
-router.get('/events', getGuestEvents);
+router.get('/events', getEvents); // Use main events controller instead
 router.get('/song-requests', getGuestSongRequests);
 
 module.exports = router;

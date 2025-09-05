@@ -305,12 +305,24 @@ const eventParticipantAccess = asyncHandler(async (req, res, next) => {
   }
 
   // Members and Guests must be joined to the event
-  if (req.user.role === 'Member' || req.user.role === 'Guest') {
+  if (req.user.role === 'Member' || req.user.role === 'Manager' || req.user.role === 'Guest') {
     const isMember = event.Members.some(
       p => p.user.toString() === req.user._id.toString() && p.isApproved
     );
 
-    if (!isMember) {
+    // For guests, also check EventParticipant collection by email
+    let isEventParticipant = false;
+    if (req.user.role === 'Guest' && !isMember) {
+      const EventParticipant = require('../models/EventParticipant');
+      const participant = await EventParticipant.findOne({
+        event: eventId,
+        email: req.user.email,
+        isApproved: true
+      });
+      isEventParticipant = !!participant;
+    }
+
+    if (!isMember && !isEventParticipant) {
       return res.status(403).json({
         success: false,
         message: 'Access denied. You must join this event first'

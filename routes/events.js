@@ -64,7 +64,7 @@ router
 // Member management routes
 router
   .route('/:id/join')
-  .post(protect, authorize('Member'), validateObjectId('id'), handleValidationErrors, joinEvent);
+  .post(protect, authorize('Manager', 'Admin', 'Member'), validateObjectId('id'), handleValidationErrors, joinEvent);
 
 // Guest join route (no authentication required)
 router
@@ -73,7 +73,7 @@ router
 
 router
   .route('/:id/leave')
-  .post(protect, authorize('Member', 'Guest'), validateObjectId('id'), handleValidationErrors, leaveEvent);
+  .post(protect, authorize('Manager', 'Admin', 'Member'), validateObjectId('id'), handleValidationErrors, leaveEvent);
 
 // Participant viewing routes (Manager/Admin only)
 router

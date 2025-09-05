@@ -121,9 +121,9 @@ exports.createSongRequest = asyncHandler(async (req, res, next) => {
   if (!event.isActive) {
     return next(new ErrorResponse('Event is not active', 400));
   }
-
   // Check if user can request songs (admin, manager, event manager, regular Member, or guest Member)
   const user = await Person.findById(req.user.id);
+  
   const isAdmin = user.role === 'Admin';
   const isManager = user.role === 'Manager';
   const isGuest = user.role === 'Guest';
@@ -160,8 +160,16 @@ exports.createSongRequest = asyncHandler(async (req, res, next) => {
     status: { $in: ['pending', 'approved'] }
   });
 
-  if (userRequestCount >= event.maxSongsPerUser) {
-    return next(new ErrorResponse(`Maximum ${event.maxSongsPerUser} song requests allowed per user`, 400));
+  // Set maximum songs based on user role
+  let maxSongs = event.maxSongsPerUser || 1; // Default from event settings
+  
+  // For Members, allow up to 5 songs regardless of event settings
+  if (isMember || isGuestMember) {
+    maxSongs = Math.min(5, event.maxSongsPerUser || 5);
+  }
+
+  if (userRequestCount >= maxSongs) {
+    return next(new ErrorResponse(`Maximum ${maxSongs} song requests allowed per user`, 400));
   }
 
   // Create song request
@@ -303,7 +311,7 @@ exports.toggleLike = asyncHandler(async (req, res, next) => {
     member.user.toString() === req.user.id && member.isApproved
   );
   
-  if (!isMember) {
+  if (!isMember && req.user.role !== 'Guest') {
     return next(new ErrorResponse('You must be a Member to like songs', 403));
   }
 
@@ -464,5 +472,99 @@ exports.getEventStats = asyncHandler(async (req, res, next) => {
   res.status(200).json({
     success: true,
     data: stats
+  });
+});
+
+// @desc    Mark song request as played
+// @route   PUT /api/events/:eventId/song-requests/:id/mark-played
+// @access  Private (Admin/Manager only)
+exports.markSongAsPlayed = asyncHandler(async (req, res, next) => {
+  const { eventId, id } = req.params;
+  const { playDuration } = req.body;
+
+  // Check if event exists
+  const event = await Event.findById(eventId);
+  if (!event) {
+    return next(new ErrorResponse('Event not found', 404));
+  }
+
+  // Check if user is Admin or Manager of the event
+  const user = await Person.findById(req.user.id);
+  const isAdmin = user.role === 'Admin';
+  const isEventManager = event.managedBy.toString() === req.user.id;
+  const isManager = user.role === 'Manager';
+
+  if (!isAdmin && !isEventManager && !isManager) {
+    return next(new ErrorResponse('Access denied. Only Admin or Event Manager can mark songs as played', 403));
+  }
+
+  // Find and update song request
+  const songRequest = await SongRequest.findOne({ _id: id, event: eventId });
+  if (!songRequest) {
+    return next(new ErrorResponse('Song request not found', 404));
+  }
+
+  // Mark as played using the model method
+  songRequest.markAsPlayed(req.user.id, playDuration);
+  await songRequest.save();
+
+  await songRequest.populate('requestedBy', 'firstName lastName profilePicture');
+  await songRequest.populate('playedBy', 'firstName lastName');
+
+  // Emit real-time event
+  const io = req.app.get('io');
+  if (io) {
+    io.to(`event_${eventId}`).emit('songMarkedAsPlayed', {
+      songRequest,
+      event: eventId
+    });
+  }
+
+  res.status(200).json({
+    success: true,
+    data: songRequest
+  });
+});
+
+// @desc    Remove song request from list
+// @route   DELETE /api/events/:eventId/song-requests/:id/remove
+// @access  Private (Admin/Manager only)
+exports.removeSongFromList = asyncHandler(async (req, res, next) => {
+  const { eventId, id } = req.params;
+
+  // Check if event exists
+  const event = await Event.findById(eventId);
+  if (!event) {
+    return next(new ErrorResponse('Event not found', 404));
+  }
+
+  // Check if user is Admin or Manager of the event
+  const user = await Person.findById(req.user.id);
+  const isAdmin = user.role === 'Admin';
+  const isEventManager = event.managedBy.toString() === req.user.id;
+  const isManager = user.role === 'Manager';
+
+  if (!isAdmin && !isEventManager && !isManager) {
+    return next(new ErrorResponse('Access denied. Only Admin or Event Manager can remove songs', 403));
+  }
+
+  // Find and remove song request
+  const songRequest = await SongRequest.findOneAndDelete({ _id: id, event: eventId });
+  if (!songRequest) {
+    return next(new ErrorResponse('Song request not found', 404));
+  }
+
+  // Emit real-time event
+  const io = req.app.get('io');
+  if (io) {
+    io.to(`event_${eventId}`).emit('songRemovedFromList', {
+      songRequestId: id,
+      event: eventId
+    });
+  }
+
+  res.status(200).json({
+    success: true,
+    message: 'Song request removed successfully'
   });
 });
