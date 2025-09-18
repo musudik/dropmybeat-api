@@ -353,3 +353,45 @@ exports.validatePagination = [
     .isIn(['createdAt', '-createdAt', 'name', '-name', 'startTime', '-startTime'])
     .withMessage('Invalid sort parameter')
 ];
+
+// Event Feedback validations
+exports.validateEventFeedback = [
+  body('firstName')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('First name must be between 2 and 50 characters'),
+  body('rating')
+    .isInt({ min: 1, max: 5 })
+    .withMessage('Rating must be between 1 and 5 stars'),
+  body('comment')
+    .trim()
+    .isLength({ min: 10, max: 1000 })
+    .withMessage('Comment must be between 10 and 1000 characters')
+];
+
+exports.validateFeedbackApproval = [
+  body('isApproved')
+    .isBoolean()
+    .withMessage('isApproved must be a boolean value')
+];
+
+// Add a new validation function for feedback pagination
+exports.validateFeedbackPagination = [
+  query('page')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Page must be a positive integer'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100'),
+  query('sort')
+    .optional()
+    .isIn(['newest', 'oldest', 'rating-high', 'rating-low', 'createdAt', '-createdAt'])
+    .withMessage('Invalid sort parameter'),
+  query('rating')
+    .optional()
+    .isIn(['1', '2', '3', '4', '5', 'all'])
+    .withMessage('Rating must be 1-5 or "all"')
+];

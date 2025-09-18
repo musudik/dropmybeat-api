@@ -20,6 +20,14 @@ const {
   deleteEventBanner
 } = require('../controllers/eventController');
 const { createSongRequest } = require('../controllers/songRequestController');
+const {
+  getEventFeedback,
+  createEventFeedback,
+  getFeedback,
+  approveFeedback,
+  deleteFeedback,
+  getFeedbackStats
+} = require('../controllers/eventFeedbackController');
 const { 
   protect, 
   authorize, 
@@ -33,7 +41,10 @@ const {
   validateEventUpdate,
   validateObjectId,
   validatePagination,
+  validateFeedbackPagination,
   validateSongRequest,
+  validateEventFeedback,
+  validateFeedbackApproval,
   handleValidationErrors
 } = require('../middleware/validation');
 const { upload } = require('../middleware/upload');
@@ -100,5 +111,24 @@ router.get('/:id/logo', getEventLogo);
 router.get('/:id/banner', getEventBanner);
 router.delete('/:id/logo', protect, deleteEventLogo);
 router.delete('/:id/banner', protect, deleteEventBanner);
+
+// Event Feedback routes (Public access - no authentication required)
+router
+  .route('/:eventId/feedback')
+  .get(validateObjectId('eventId'), validateFeedbackPagination, handleValidationErrors, getEventFeedback)
+  .post(validateObjectId('eventId'), validateEventFeedback, handleValidationErrors, createEventFeedback);
+
+router
+  .route('/:eventId/feedback/stats')
+  .get(validateObjectId('eventId'), handleValidationErrors, getFeedbackStats);
+
+router
+  .route('/:eventId/feedback/:id')
+  .get(validateObjectId('eventId'), validateObjectId('id'), handleValidationErrors, getFeedback)
+  .delete(protect, managerEventAccess, validateObjectId('eventId'), validateObjectId('id'), handleValidationErrors, deleteFeedback);
+
+router
+  .route('/:eventId/feedback/:id/approve')
+  .put(protect, managerEventAccess, validateObjectId('eventId'), validateObjectId('id'), handleValidationErrors, approveFeedback);
 
 module.exports = router;
